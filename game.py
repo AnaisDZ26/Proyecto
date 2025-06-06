@@ -1,7 +1,13 @@
 import pygame as pg
+import uuid
+import os
+import shutil
+import subprocess
 
 WIDTH = 1280
 HEIGHT = 720
+
+DEV = True
 
 GRID_SIZE = (10, 10)
 
@@ -15,7 +21,11 @@ class Grid:
     def __init__(self, size):
         self.size = size
         self.cells = []  # Store cell rectangles and their positions
-        self.boats = [{'size': 2, 'pos': (0,0), 'direction': 'h' }]
+        self.boats = []
+
+    def add_boat(self, boat):
+        boat['id'] = len(self.boats) + 1
+        self.boats.append(boat)
 
     def preview(self, boat):
         self.preview_boat = boat.copy()  # Make a copy to avoid modifying the original
@@ -170,15 +180,130 @@ class MenuScene(Scene):
         text_rect = text.get_rect(center=self.buttons["play"]["rect"].center)
         screen.blit(text, text_rect)
 
+class MatchScene(Scene):
+    def __init__(self, game):
+        self.game = game
+        self.grid = None
+        self.buttons = {
+            "back": {
+                "rect": pg.Rect(0, 0, 100, 40),
+                "pos": (WIDTH - 60, HEIGHT - 30),
+                "click": lambda: self.game.goto_scene("setup")
+            }
+        }
+
+        for btn in self.buttons.values():
+            btn["rect"].center = btn["pos"]
+
+    def save_config(self):
+        # Clean cache directory
+        if os.path.exists("cache"):
+            shutil.rmtree("cache")
+        os.makedirs("cache")
+
+        with open(f"cache/{self.id}.txt", "w") as f:
+            # Write match ID
+            f.write(f"{self.id}\n")
+            
+            # Write grid size
+            f.write(f"{self.grid.size[0]} {self.grid.size[1]}\n")
+            
+            # Create and write the grid state
+            grid_state = [[0 for _ in range(self.grid.size[1])] for _ in range(self.grid.size[0])]
+            
+            # Fill in boat positions
+            for boat in self.grid.boats:
+                x, y = boat['pos']
+                for i in range(boat['size']):
+                    if boat.get('direction', 'h') == 'h':  # Default to horizontal if not set
+                        grid_state[y + i][x] = boat['id']
+                    else:  # vertical
+                        grid_state[y][x + i] = boat['id']
+            
+            # Write the grid state
+            for row in grid_state:
+                f.write(" ".join(map(str, row)) + "\n")
+
+    def start_backend(self):
+
+        if DEV or not os.path.exists("main.exe"):
+            subprocess.run(["gcc", "main.c", "-o", "main.exe"])
+
+        result = subprocess.run(["./main.exe", "iniciarJuego", f"{self.id}.txt"], capture_output=True, text=True)
+        print(result.stdout)
+        print(result.stderr)
+
+    def setup(self, grid):
+        self.grid = grid
+        self.id = str(uuid.uuid4())[:5]
+        self.save_config()
+        self.start_backend()
+
+    def update(self, screen):
+        # Draw the grid
+        self.grid.draw(screen, WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT * 0.8)
+        
+        # Draw back button
+        mouse_pos = pg.mouse.get_pos()
+        btn_color = (10, 70, 135) if self.buttons["back"]["rect"].collidepoint(mouse_pos) else (13, 82, 154)
+        
+        pg.draw.rect(screen, btn_color, self.buttons["back"]["rect"], 0, 10)
+
+        font = pg.font.Font(None, 24)
+        text = font.render("Back", True, (255, 255, 255))
+        text_rect = text.get_rect(center=self.buttons["back"]["rect"].center)
+        screen.blit(text, text_rect)
+
 class SetupScene(Scene):
     def __init__(self, game):
         self.game = game
         self.grid = Grid(GRID_SIZE)
 
-        new_boat = lambda size: {'size': size, 'pos': None, 'direction': None, 'selected': False }
+        new_boat = lambda size: {'size': size, 'pos': None, 'direction': 'h', 'selected': False }
         self.boats = [ new_boat(2), new_boat(3), new_boat(3), new_boat(4), new_boat(5) ]
 
+        self.buttons = {
+            "start": {
+                "rect": pg.Rect(0, 0, 120, 40),
+                "pos": (WIDTH - 70, HEIGHT - 30),
+                "click": lambda: self.start_match()
+            }
+        }
+
+        for btn in self.buttons.values():
+            btn["rect"].center = btn["pos"]
+
         self.game.event_manager.add_action_key(pg.K_r, self.rotate_selected_boat)
+
+    def start_match(self):
+        self.game.scenes["match"]
+        self.game.goto_scene("match", grid=self.grid)
+
+    def place_boat(self, pos):
+        # Find the selected boat
+        selected_boat = None
+        for boat in self.boats:
+            if boat['selected']:
+                selected_boat = boat
+                break
+        
+        if not selected_boat:
+            return
+            
+        # Check if the boat can be placed at this position
+        if not self.grid.preview_pos:
+            return
+            
+        # Place the boat
+        selected_boat['pos'] = self.grid.preview_pos
+        selected_boat['direction'] = selected_boat.get('direction', 'h')  # Ensure direction is set
+        selected_boat['selected'] = False
+        
+        # Add the boat to the grid
+        self.grid.add_boat(selected_boat.copy())
+        
+        # Remove the boat from the available boats
+        self.boats.remove(selected_boat)
 
     def rotate_selected_boat(self):
         for boat in self.boats:
@@ -207,12 +332,25 @@ class SetupScene(Scene):
 
 
     def update(self, screen):
-
         self.grid.draw(screen, WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT * 0.8) 
         rect = pg.Rect(0, 0, 80, 2*HEIGHT//3)
         rect.center = (100, HEIGHT / 2)
         pg.draw.rect(screen, (12, 139, 221), rect, border_radius=5)
 
+        # Handle boat placement on click
+        if self.game.event_manager.is_clicking and self.grid.preview_pos:
+            self.place_boat(self.grid.preview_pos)
+
+        # Draw start button
+        mouse_pos = pg.mouse.get_pos()
+        btn_color = (10, 70, 135) if self.buttons["start"]["rect"].collidepoint(mouse_pos) else (13, 82, 154)
+        
+        pg.draw.rect(screen, btn_color, self.buttons["start"]["rect"], 0, 10)
+
+        font = pg.font.Font(None, 24)
+        text = font.render("Start Game", True, (255, 255, 255))
+        text_rect = text.get_rect(center=self.buttons["start"]["rect"].center)
+        screen.blit(text, text_rect)
 
         margin = 5
         size = rect.size[0] - (margin * 2)
@@ -266,12 +404,14 @@ class Game:
 
         self.scenes = {
             "menu": MenuScene(self),
-            "setup": SetupScene(self)
+            "setup": SetupScene(self),
+            "match": MatchScene(self)
         }
         self.current_scene = self.scenes["menu"]
 
-    def goto_scene(self, scene_name):
+    def goto_scene(self, scene_name, *args, **kwargs):
         self.current_scene = self.scenes[scene_name]
+        self.current_scene.setup(*args, **kwargs)
         
     def setup(self):
         self.assets.load()
