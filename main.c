@@ -1,1 +1,1 @@
-printf ("ola we");
+#include <stdio.h>
