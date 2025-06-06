@@ -1,10 +1,7 @@
 # Proyecto
 
-- Integrantes: Anaís Días, Daniel Gajardo, Cristian Gallardo, Matías Salas
+- Integrantes: Anaís Díaz, Daniel Gajardo, Cristian Gallardo, Matías Salas
 
-## DEMO
-
-![DEMO](demo.mp4)
 
 ## Inicio Rápido
 
