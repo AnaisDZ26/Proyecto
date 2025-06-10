@@ -164,14 +164,22 @@ class MenuScene(Scene):
                 "click": lambda: self.game.goto_scene("setup")
             }
         }
+        self.was_hovering = False  # Track previous hover state
 
         for btn in self.buttons.values():
             btn["rect"].center = btn["pos"]
 
     def update(self, screen):
-        
         mouse_pos = pg.mouse.get_pos()
-        btn_color = (10, 70, 135) if self.buttons["play"]["rect"].collidepoint(mouse_pos) else (13, 82, 154)
+        is_hovering = self.buttons["play"]["rect"].collidepoint(mouse_pos)
+        
+        # Play hover sound when mouse enters the button
+        if is_hovering and not self.was_hovering:
+            pg.mixer.Sound(self.game.assets.audio["music"]["hover"]).play()
+        
+        self.was_hovering = is_hovering
+        
+        btn_color = (10, 70, 135) if is_hovering else (13, 82, 154)
         
         pg.draw.rect(screen, btn_color, self.buttons["play"]["rect"], 0, 10)
 
@@ -227,7 +235,7 @@ class MatchScene(Scene):
     def start_backend(self):
 
         if DEV or not os.path.exists("main.exe"):
-            subprocess.run(["gcc", "main.c", "-o", "main.exe"])
+            subprocess.run(["gcc", "main.c", "-o", "main.exe"], )
 
         result = subprocess.run(["./main.exe", "iniciarJuego", f"{self.id}.txt"], capture_output=True, text=True)
         print(result.stdout)
@@ -293,6 +301,8 @@ class SetupScene(Scene):
         # Check if the boat can be placed at this position
         if not self.grid.preview_pos:
             return
+        
+        pg.mixer.Sound(self.game.assets.audio["music"]["create"]).play()
             
         # Place the boat
         selected_boat['pos'] = self.grid.preview_pos
@@ -321,7 +331,7 @@ class SetupScene(Scene):
 
         y = size // 2 - in_size // 2
         x = (size - (in_size + margin) * n) // 2
-        for i in range(n):
+        for _ in range(n):
             rect = pg.Rect(x, y, in_size, in_size)
             shadow_v = pg.Vector2(1, 2)
             pg.draw.rect(surf, (3, 33, 64), rect.move(shadow_v), border_radius=1)
@@ -466,7 +476,9 @@ class AssetManager:
     def load(self):
         self.audio = {
             "music": {
-                "main": "assets/audio/menu.mp3"
+                "main": "assets/audio/menu.mp3",
+                "hover": "assets/audio/hover.wav",
+                "create": "assets/audio/create.wav"
             }
         }
 
