@@ -18,14 +18,25 @@ class Grid:
     preview_boat = None
     preview_pos = None
 
-    def __init__(self, size):
+    def __init__(self, size, width, height):
         self.size = size
-        self.cells = []  # Store cell rectangles and their positions
         self.boats = []
+
+        self.width = width
+        self.height = height
+
+        self.cell_size = min(self.width // self.size[0], self.height // self.size[1])
+        self.margin = 3
+        
+        self.grid_width = (self.cell_size * self.size[0]) + (self.margin * (self.size[0] - 1))
+        self.grid_height = (self.cell_size * self.size[1]) + (self.margin * (self.size[1] - 1))
+        
 
     def add_boat(self, boat):
         boat['id'] = len(self.boats) + 1
         self.boats.append(boat)
+        self.preview_boat = None
+        self.preview_pos = None
 
     def preview(self, boat):
         self.preview_boat = boat.copy()  # Make a copy to avoid modifying the original
@@ -33,48 +44,19 @@ class Grid:
             self.preview_boat['direction'] = 'h'  # Default to horizontal if not set
 
     def draw_boat(self, screen, boat, is_preview=False):
-        # Get the cell size from the first cell in the grid
-        if not self.cells:
-            return
-            
-        cell_size = self.cells[0].width
-        margin = 3  # Same margin as grid cells
-        padding = 4  # Padding to make boats slightly smaller
         
-        # Calculate the cells this boat occupies
-        cells = []
-        for i in range(boat['size']):
-            try:
-                if boat['direction'] == 'h':
-                    # For horizontal boats, increment the column (j)
-                    cell_idx = boat['pos'][0] * self.size[1] + (boat['pos'][1] + i)
-                else:  # vertical
-                    # For vertical boats, increment the row (i)
-                    cell_idx = (boat['pos'][0] + i) * self.size[1] + boat['pos'][1]
-                
-                # Check if the cell index is valid
-                if 0 <= cell_idx < len(self.cells):
-                    cells.append(self.cells[cell_idx])
-            except IndexError:
-                return  # Skip drawing if boat would go out of bounds
-        
-        # If no valid cells were found, don't draw the boat
-        if not cells:
-            return
-            
-        # Calculate the rectangle that encompasses all cells
-        min_x = min(cell.x for cell in cells)
-        min_y = min(cell.y for cell in cells)
-        max_x = max(cell.x + cell.width for cell in cells)
-        max_y = max(cell.y + cell.height for cell in cells)
-        
+        padding = 4
+
+        x0, y0 = boat['pos']
+        x = x0 * (self.cell_size + self.margin) + padding
+        y = y0 * (self.cell_size + self.margin) + padding
+
+        long = boat['size'] * (self.cell_size + self.margin) - padding * 2 - self.margin
+        short = self.cell_size - padding * 2
+        width, height = (long, short) if boat['direction'] == 'h' else (short, long)
+
         # Create the boat rectangle with padding
-        boat_rect = pg.Rect(
-            min_x + padding,
-            min_y + padding,
-            max_x - min_x - (padding * 2),
-            max_y - min_y - (padding * 2)
-        )
+        boat_rect = pg.Rect(x, y, width, height)
         
         # Create a surface for the boat with alpha channel
         boat_surf = pg.Surface((boat_rect.width, boat_rect.height), pg.SRCALPHA)
@@ -89,53 +71,55 @@ class Grid:
         
         # Draw the boat surface onto the screen
         screen.blit(boat_surf, boat_rect)
+    
+    def draw_cell(self, screen, i, j):
+        rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
 
-    def draw(self, screen, center_x, center_y, width, height):
-        n, m = self.size
+        # Check if mouse is hovering over this cell
+        mouse_pos = pg.mouse.get_pos() - self.start_pos
+        color = self.hover_color if rect.collidepoint(mouse_pos) else self.cell_color
         
-        margin = 3
-        cell_size_x = (width - (margin * (n - 1))) // n
-        cell_size_y = (height - (margin * (m - 1))) // m
-        cell_size = min(cell_size_x, cell_size_y)
-        
-        boat_size = cell_size * 0.6
-        
-        grid_width = (cell_size * n) + (margin * (n - 1))
-        grid_height = (cell_size * m) + (margin * (m - 1))
-        
-        start_x = center_x - grid_width // 2
-        start_y = center_y - grid_height // 2
-        
-        # Clear previous cells
-        self.cells = []
-        preview_surf = None
+        # Draw cell
+        pg.draw.rect(screen, color, rect, border_radius=5)
+
+        if self.preview_boat and rect.collidepoint(mouse_pos):
+            # Check if boat would exceed grid boundaries
+            boat_size = self.preview_boat['size']
+            direction = self.preview_boat.get('direction', 'h')
+            
+            # Check if boat fits in current direction, if not try the other direction
+            if direction == 'h' and i + boat_size > self.size[0]:
+                direction = 'v'
+            elif direction == 'v' and j + boat_size > self.size[1]:
+                direction = 'h'
+                
+            # Set preview position if boat fits in either direction
+            if (direction == 'h' and i + boat_size <= self.size[0]) or \
+               (direction == 'v' and j + boat_size <= self.size[1]):
+                self.preview_boat['direction'] = direction
+                self.preview_pos = (i, j)
+
+    def draw(self, screen, center_x, center_y):
+
         self.preview_pos = None
+
+        screen_middle = pg.Vector2(center_x, center_y)
+        grid_middle = pg.Vector2(self.grid_width // 2, self.grid_height // 2)
+        self.start_pos = screen_middle - grid_middle
+
+        grid_surf = pg.Surface((self.grid_width, self.grid_height), pg.SRCALPHA)
         
+
+        n, m = self.size
         # Draw cells
         for i in range(n):
             for j in range(m):
-                rect = pg.Rect(
-                    start_x + (i * (cell_size + margin)),
-                    start_y + (j * (cell_size + margin)),
-                    cell_size,
-                    cell_size
-                )
-                self.cells.append(rect)
-                
-                # Check if mouse is hovering over this cell
-                mouse_pos = pg.mouse.get_pos()
-                color = self.hover_color if rect.collidepoint(mouse_pos) else self.cell_color
-                
-                # Draw cell
-                pg.draw.rect(screen, color, rect, border_radius=5)
-
-                if self.preview_boat and rect.collidepoint(mouse_pos):
-                    self.preview_pos = (i, j)
+                self.draw_cell(grid_surf, i, j)
 
         # Draw boats after the grid
         for boat in self.boats:
             if boat['pos'] is not None:
-                self.draw_boat(screen, boat)
+                self.draw_boat(grid_surf, boat)
 
         # Draw preview boat if we have a position
         if self.preview_boat and self.preview_pos:
@@ -144,10 +128,19 @@ class Grid:
             # Ensure direction is set
             if 'direction' not in preview_boat:
                 preview_boat['direction'] = 'h'
-            self.draw_boat(screen, preview_boat, is_preview=True)
+            self.draw_boat(grid_surf, preview_boat, is_preview=True)
+
+        screen.blit(grid_surf, self.start_pos)
 
 class Scene:
+
     buttons = {}
+    ui = None
+
+    def __init__(self, game):
+        self.game = game
+        self.setup()
+
     def setup(self):
         pass
 
@@ -155,53 +148,21 @@ class Scene:
         pass
 
 class MenuScene(Scene):
-    def __init__(self, game):
-        self.game = game
-        self.buttons = {
-            "play": {
-                "rect": pg.Rect(100, 100, 200, 100),
-                "pos": (WIDTH / 2, HEIGHT / 2),
-                "click": lambda: self.game.goto_scene("setup")
-            }
-        }
-        self.was_hovering = False  # Track previous hover state
+    def setup(self):
+        self.ui = UIManager(self.game)
 
-        for btn in self.buttons.values():
-            btn["rect"].center = btn["pos"]
+        action = lambda: self.game.goto_scene("setup")
+        self.ui.add_button( "play", (200, 100), action, "Jugar", center=(WIDTH / 2, HEIGHT / 2))
 
     def update(self, screen):
-        mouse_pos = pg.mouse.get_pos()
-        is_hovering = self.buttons["play"]["rect"].collidepoint(mouse_pos)
-        
-        # Play hover sound when mouse enters the button
-        if is_hovering and not self.was_hovering:
-            pg.mixer.Sound(self.game.assets.audio["music"]["hover"]).play()
-        
-        self.was_hovering = is_hovering
-        
-        btn_color = (10, 70, 135) if is_hovering else (13, 82, 154)
-        
-        pg.draw.rect(screen, btn_color, self.buttons["play"]["rect"], 0, 10)
-
-        font = pg.font.Font(None, 36)
-        text = font.render("Jugar", True, (255, 255, 255))
-        text_rect = text.get_rect(center=self.buttons["play"]["rect"].center)
-        screen.blit(text, text_rect)
+        self.ui.update(screen)
 
 class MatchScene(Scene):
-    def __init__(self, game):
-        self.game = game
+    def setup(self):
         self.grid = None
-        self.buttons = {
-            "back": {
-                "rect": pg.Rect(0, 0, 100, 40),
-                "pos": (WIDTH - 60, HEIGHT - 30),
-                "click": lambda: self.game.goto_scene("setup")
-            }
-        }
-
-        for btn in self.buttons.values():
-            btn["rect"].center = btn["pos"]
+        self.ui = UIManager(self.game)
+        action = lambda: self.game.goto_scene("setup")
+        self.ui.add_button( "back", (100, 40), action, "Back", center=(WIDTH - 60, HEIGHT - 30))
 
     def save_config(self):
         # Clean cache directory
@@ -241,7 +202,7 @@ class MatchScene(Scene):
         print(result.stdout)
         print(result.stderr)
 
-    def setup(self, grid):
+    def init_match(self, grid):
         self.grid = grid
         self.id = str(uuid.uuid4())[:5]
         self.save_config()
@@ -250,36 +211,19 @@ class MatchScene(Scene):
     def update(self, screen):
         # Draw the grid
         self.grid.draw(screen, WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT * 0.8)
-        
-        # Draw back button
-        mouse_pos = pg.mouse.get_pos()
-        btn_color = (10, 70, 135) if self.buttons["back"]["rect"].collidepoint(mouse_pos) else (13, 82, 154)
-        
-        pg.draw.rect(screen, btn_color, self.buttons["back"]["rect"], 0, 10)
-
-        font = pg.font.Font(None, 24)
-        text = font.render("Back", True, (255, 255, 255))
-        text_rect = text.get_rect(center=self.buttons["back"]["rect"].center)
-        screen.blit(text, text_rect)
+        self.ui.update(screen)
 
 class SetupScene(Scene):
-    def __init__(self, game):
-        self.game = game
-        self.grid = Grid(GRID_SIZE)
+    def setup(self):
+        self.grid = Grid(GRID_SIZE, WIDTH, HEIGHT * 0.8)
 
         new_boat = lambda size: {'size': size, 'pos': None, 'direction': 'h', 'selected': False }
         self.boats = [ new_boat(2), new_boat(3), new_boat(3), new_boat(4), new_boat(5) ]
 
-        self.buttons = {
-            "start": {
-                "rect": pg.Rect(0, 0, 120, 40),
-                "pos": (WIDTH - 70, HEIGHT - 30),
-                "click": lambda: self.start_match()
-            }
-        }
+        self.ui = UIManager(self.game)
 
-        for btn in self.buttons.values():
-            btn["rect"].center = btn["pos"]
+        action = lambda: self.start_match()
+        self.ui.add_button( "start", (120, 40), action, "Start Game", center=(WIDTH - 70, HEIGHT - 30))
 
         self.game.event_manager.add_action_key(pg.K_r, self.rotate_selected_boat)
 
@@ -340,9 +284,8 @@ class SetupScene(Scene):
 
         return pg.transform.rotate(surf, 45)
 
-
     def update(self, screen):
-        self.grid.draw(screen, WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT * 0.8) 
+        self.grid.draw(screen, WIDTH / 2, HEIGHT / 2) 
         rect = pg.Rect(0, 0, 80, 2*HEIGHT//3)
         rect.center = (100, HEIGHT / 2)
         pg.draw.rect(screen, (12, 139, 221), rect, border_radius=5)
@@ -351,16 +294,7 @@ class SetupScene(Scene):
         if self.game.event_manager.is_clicking and self.grid.preview_pos:
             self.place_boat(self.grid.preview_pos)
 
-        # Draw start button
-        mouse_pos = pg.mouse.get_pos()
-        btn_color = (10, 70, 135) if self.buttons["start"]["rect"].collidepoint(mouse_pos) else (13, 82, 154)
-        
-        pg.draw.rect(screen, btn_color, self.buttons["start"]["rect"], 0, 10)
-
-        font = pg.font.Font(None, 24)
-        text = font.render("Start Game", True, (255, 255, 255))
-        text_rect = text.get_rect(center=self.buttons["start"]["rect"].center)
-        screen.blit(text, text_rect)
+        self.ui.update(screen)
 
         margin = 5
         size = rect.size[0] - (margin * 2)
@@ -402,6 +336,56 @@ class SetupScene(Scene):
                 
                 pos.y += size + margin
 
+class UIManager:
+    def __init__(self, game):
+        self.game = game
+        self.buttons = {}
+        self.was_hovering = {}  # Track hover state for each button
+
+    def add_button(self, name, size, click, text=None, topleft=None, center=None):
+        rect = pg.Rect(0, 0, size[0], size[1])
+        if center is not None:
+            rect.center = center
+        elif topleft is not None:
+            rect.topleft = topleft
+            
+        self.buttons[name] = {
+            "rect": rect,
+            "click": click,
+            "text": text
+        }
+        self.was_hovering[name] = False
+
+    def mousePressed(self, pos):
+        for _, btn in self.buttons.items():
+            if btn["rect"].collidepoint(pos):
+                btn["click"]()
+                return True
+        return False
+
+    def update(self, screen):
+        mouse_pos = pg.mouse.get_pos()
+        
+        for name, btn in self.buttons.items():
+            is_hovering = btn["rect"].collidepoint(mouse_pos)
+            
+            # Play hover sound when mouse enters the button
+            if is_hovering and not self.was_hovering[name]:
+                pg.mixer.Sound(self.game.assets.audio["music"]["hover"]).play()
+            
+            self.was_hovering[name] = is_hovering
+            
+            # Draw button
+            btn_color = (10, 70, 135) if is_hovering else (13, 82, 154)
+            pg.draw.rect(screen, btn_color, btn["rect"], 0, 10)
+            
+            # Draw text if provided
+            if btn["text"]:
+                font = pg.font.Font(None, 24)
+                text = font.render(btn["text"], True, (255, 255, 255))
+                text_rect = text.get_rect(center=btn["rect"].center)
+                screen.blit(text, text_rect)
+
 
 class Game:
     def __init__(self, win_size):
@@ -421,7 +405,10 @@ class Game:
 
     def goto_scene(self, scene_name, *args, **kwargs):
         self.current_scene = self.scenes[scene_name]
-        self.current_scene.setup(*args, **kwargs)
+        if scene_name == "match":
+            self.current_scene.init_match(*args, **kwargs)
+        else:
+            self.current_scene.setup(*args, **kwargs)
         
     def setup(self):
         self.assets.load()
@@ -433,6 +420,8 @@ class Game:
         screen.fill((12, 139, 221))
 
         self.current_scene.update(screen)
+        if self.current_scene.ui:
+            self.current_scene.ui.update(screen)
 
         return self.running
 
@@ -453,9 +442,9 @@ class EventManager:
             self.actions[key]()
 
     def handle_click(self, pos):
-        for btn in self.game.current_scene.buttons.values():
-            if btn["rect"].collidepoint(pos):
-                btn["click"]()
+        scene = self.game.current_scene
+        if scene.ui:
+            scene.ui.mousePressed(pos)
 
     def update(self):
         self.is_clicking = False
