@@ -39,7 +39,7 @@ class Grid:
         self.preview_pos = None
 
     def preview(self, boat):
-        self.preview_boat = boat.copy()  # Make a copy to avoid modifying the original
+        self.preview_boat = boat
         if 'direction' not in self.preview_boat:
             self.preview_boat['direction'] = 'h'  # Default to horizontal if not set
 
@@ -92,6 +92,7 @@ class Grid:
                 direction = 'v'
             elif direction == 'v' and j + boat_size > self.size[1]:
                 direction = 'h'
+            self.preview_boat['direction'] = direction
                 
             # Set preview position if boat fits in either direction
             if (direction == 'h' and i + boat_size <= self.size[0]) or \
@@ -141,9 +142,9 @@ class ObjectPanel:
         self.width = width
         self.height = height
         self.items = {
-            'bomb': {'quantity': 1, 'image': 'bomb.png'},
-            'spyglass': {'quantity': 1, 'image': 'spyglass.png'},
-            'torpedo': {'quantity': 1, 'image': 'torpedo.png'}
+            'bomb': {'id': 1, 'quantity': 1, 'image': 'bomb.png'},
+            'spyglass': {'id': 2, 'quantity': 1, 'image': 'spyglass.png'},
+            'torpedo': {'id': 3, 'quantity': 1, 'image': 'torpedo.png'}
         }
         self.selector_rects = {}  # Store selector rectangles for click detection
         self.setup()
@@ -293,13 +294,21 @@ class MatchScene(Scene):
                 x, y = boat['pos']
                 for i in range(boat['size']):
                     if boat.get('direction', 'h') == 'h':  # Default to horizontal if not set
-                        grid_state[y + i][x] = boat['id']
+                        grid_state[y][x+i] = boat['id']
                     else:  # vertical
-                        grid_state[y][x + i] = boat['id']
+                        grid_state[y+i][x] = boat['id']
             
             # Write the grid state
             for row in grid_state:
                 f.write(" ".join(map(str, row)) + "\n")
+
+            # Write objects information
+            objects_with_quantity = [item for item in self.game.scenes["setup"].object_panel.items.values() if item['quantity'] > 0]
+            f.write(f"N objetos: {len(objects_with_quantity)}\n")
+            
+            # Write each object's id and quantity
+            for item in objects_with_quantity:
+                f.write(f"{item['id']} {item['quantity']}\n")
 
     def start_backend(self):
 
