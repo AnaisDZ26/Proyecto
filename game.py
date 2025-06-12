@@ -132,6 +132,114 @@ class Grid:
 
         screen.blit(grid_surf, self.start_pos)
 
+class ObjectPanel:
+
+    img_size = (40, 40)
+
+    def __init__(self, game, width, height):
+        self.game = game
+        self.width = width
+        self.height = height
+        self.items = {
+            'bomb': {'quantity': 1, 'image': 'bomb.png'},
+            'spyglass': {'quantity': 1, 'image': 'spyglass.png'},
+            'torpedo': {'quantity': 1, 'image': 'torpedo.png'}
+        }
+        self.selector_rects = {}  # Store selector rectangles for click detection
+        self.setup()
+
+    def setup(self):
+        # Load images
+        for item in self.items.values():
+            item['surface'] = pg.image.load(f"assets/img/{item['image']}").convert_alpha()
+            # Scale images to fit in grid cells
+            item['surface'] = pg.transform.scale(item['surface'], self.img_size)
+
+    def draw_quantity_selector(self, screen, x, y, quantity, item_name):
+        # Draw quantity background
+        selector_rect = pg.Rect(x, y, self.width // 3, 30)
+        pg.draw.rect(screen, (10, 70, 135), selector_rect)
+        
+        # Draw minus button
+        minus_rect = pg.Rect(x + 5, y + 5, 15, 15)
+        pg.draw.rect(screen, (13, 82, 154), minus_rect, border_radius=3)
+        font = pg.font.Font(None, 20)
+
+        minus_text = font.render("-", True, (255, 255, 255))
+        
+        screen.blit(minus_text, (x + 10, y + 5))
+        
+        # Draw quantity
+        quantity_text = font.render(str(quantity), True, (255, 255, 255))
+        screen.blit(quantity_text, (x + 30, y + 5))
+        
+        # Draw plus button
+        plus_rect = pg.Rect(x + 48, y + 5, 15, 15)
+        pg.draw.rect(screen, (13, 82, 154), plus_rect, border_radius=3)
+        plus_text = font.render("+", True, (255, 255, 255))
+        screen.blit(plus_text, (x + 53, y + 5))
+        
+        # Store rectangles for click detection
+        self.selector_rects[item_name] = {
+            'minus': minus_rect,
+            'plus': plus_rect
+        }
+
+    def handle_click(self, pos):
+        # Convert global position to local panel position
+        local_pos = (pos[0] - self.panel_x, pos[1] - self.panel_y)
+        
+        # Check each item's selector buttons
+        for item_name, rects in self.selector_rects.items():
+            if rects['minus'].collidepoint(local_pos):
+                if self.items[item_name]['quantity'] > 0:
+                    self.items[item_name]['quantity'] -= 1
+                    pg.mixer.Sound(self.game.assets.audio["music"]["hover"]).play()
+            elif rects['plus'].collidepoint(local_pos):
+                self.items[item_name]['quantity'] += 1
+                pg.mixer.Sound(self.game.assets.audio["music"]["hover"]).play()
+
+    def update(self, screen, x, y):
+        self.panel_x = x
+        self.panel_y = y
+        
+        # Draw panel background
+        surf = pg.Surface((self.width, self.height), pg.SRCALPHA)
+        pg.draw.rect(surf, (10, 70, 135), (0, 0, self.width, self.height), border_radius=5)
+        
+        # Calculate grid layout
+        cell_width = self.width // 3
+        cell_height = 100
+        padding = 10
+        
+        # Draw items in grid
+        for i, (item_name, item) in enumerate(self.items.items()):
+            col = i % 3
+            row = i // 3
+            
+            # Calculate box position
+            box_rect = pg.Rect(
+                col * cell_width + padding,
+                row * cell_height + padding,
+                cell_width - padding * 2,
+                cell_height - padding * 2
+            )
+            pg.draw.rect(surf, (13, 82, 154), box_rect, border_radius=8)
+            
+            # Calculate centered image position
+            item_x = box_rect.centerx - self.img_size[0] // 2
+            item_y = box_rect.centery - self.img_size[1] // 2 - 10  # Offset up slightly to make room for selector
+            
+            # Draw item image
+            surf.blit(item['surface'], (item_x, item_y))
+            
+            # Draw quantity selector
+            selector_x = box_rect.left  # Center the selector (80px wide)
+            selector_y = item_y + box_rect.height - 30
+            self.draw_quantity_selector(surf, selector_x, selector_y, item['quantity'], item_name)
+        
+        screen.blit(surf, (x, y))
+
 class Scene:
 
     buttons = {}
@@ -210,12 +318,13 @@ class MatchScene(Scene):
 
     def update(self, screen):
         # Draw the grid
-        self.grid.draw(screen, WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT * 0.8)
+        self.grid.draw(screen, WIDTH / 2, HEIGHT / 2)
         self.ui.update(screen)
 
 class SetupScene(Scene):
     def setup(self):
         self.grid = Grid(GRID_SIZE, WIDTH, HEIGHT * 0.8)
+        self.object_panel = ObjectPanel(self.game, WIDTH // 5, HEIGHT * 0.8)
 
         new_boat = lambda size: {'size': size, 'pos': None, 'direction': 'h', 'selected': False }
         self.boats = [ new_boat(2), new_boat(3), new_boat(3), new_boat(4), new_boat(5) ]
@@ -284,6 +393,23 @@ class SetupScene(Scene):
 
         return pg.transform.rotate(surf, 45)
 
+    def handle_click(self, pos):
+        # Check if click is on object panel
+        panel_x = WIDTH - self.object_panel.width - 50
+        panel_y = HEIGHT // 2 - self.object_panel.height // 2
+        panel_rect = pg.Rect(panel_x, panel_y, self.object_panel.width, self.object_panel.height)
+        
+        if panel_rect.collidepoint(pos):
+            self.object_panel.handle_click(pos)
+            return True
+            
+        # Handle boat placement on click
+        if self.grid.preview_pos:
+            self.place_boat(self.grid.preview_pos)
+            return True
+            
+        return False
+
     def update(self, screen):
         self.grid.draw(screen, WIDTH / 2, HEIGHT / 2) 
         rect = pg.Rect(0, 0, 80, 2*HEIGHT//3)
@@ -291,10 +417,11 @@ class SetupScene(Scene):
         pg.draw.rect(screen, (12, 139, 221), rect, border_radius=5)
 
         # Handle boat placement on click
-        if self.game.event_manager.is_clicking and self.grid.preview_pos:
-            self.place_boat(self.grid.preview_pos)
+        if self.game.event_manager.is_clicking:
+            self.handle_click(pg.mouse.get_pos())
 
         self.ui.update(screen)
+        self.object_panel.update(screen, WIDTH - self.object_panel.width - 50, HEIGHT // 2 - self.object_panel.height // 2)
 
         margin = 5
         size = rect.size[0] - (margin * 2)
@@ -396,13 +523,6 @@ class Game:
         self.event_manager = EventManager(self)
         self.assets = AssetManager()
 
-        self.scenes = {
-            "menu": MenuScene(self),
-            "setup": SetupScene(self),
-            "match": MatchScene(self)
-        }
-        self.current_scene = self.scenes["menu"]
-
     def goto_scene(self, scene_name, *args, **kwargs):
         self.current_scene = self.scenes[scene_name]
         if scene_name == "match":
@@ -414,6 +534,13 @@ class Game:
         self.assets.load()
         pg.mixer.music.load(self.assets.audio["music"]["main"])
         pg.mixer.music.play(-1)
+
+        self.scenes = {
+            "menu": MenuScene(self),
+            "setup": SetupScene(self),
+            "match": MatchScene(self)
+        }
+        self.current_scene = self.scenes["menu"]
 
     def update(self, screen):
         self.event_manager.update()
