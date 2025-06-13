@@ -9,7 +9,7 @@ HEIGHT = 720
 
 DEV = True
 
-GRID_SIZE = (15, 15)
+GRID_SIZE = (10, 10)
 
 class Grid:
 
