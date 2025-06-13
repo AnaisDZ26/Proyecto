@@ -44,7 +44,7 @@ bool empty(Stack* stack) {
 
 void stack_destroy(Stack* stack) {
     while (!empty(stack)) {
-        stack_pop(stack);  // frees each node
+        pop(stack);  // frees each node
     }
     free(stack);
 }

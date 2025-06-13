@@ -1,2 +1,4 @@
 main.exe
 cache/*
+.vscode/*
+.vscode/

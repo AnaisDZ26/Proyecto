@@ -23,50 +23,64 @@ Partida* leerConfiguracion(const char* filename) {
     return NULL;
 }
 
-void iniciarJuego(const char* filename) {
+int iniciarJuego(const char* filename) {
     char fullpath[256];
     snprintf(fullpath, sizeof(fullpath), "cache/%s", filename);
     
     Partida* partida = leerConfiguracion(fullpath);
     if (!partida) {
         printf("Error: No se pudo cargar la configuración del juego\n");
-        return;
+        return 1;
     }
 
     printf("Partida iniciada con ID: %s\n", partida->id);
 
     free(partida);
+    return 0;
 }
 
-void mostrarAyuda(const char* program_name) {
+int mostrarAyuda() {
     printf("Battleship Game - Ayuda\n");
     printf("======================\n\n");
-    printf("Uso: %s <accion> [parametros]\n\n", program_name);
+    printf("Uso: <accion> [parametros]\n\n");
 
     // ...
+    return 0;
 }
 
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
+int main(int n_args, char* args[]) {
+
+    if (n_args < 2) {
         printf("Error: No se proporcionó ninguna acción\n");
-        mostrarAyuda(argv[0]);
-        return 1;
+        return mostrarAyuda();
     }
 
-    if (strcmp(argv[1], "iniciarJuego") == 0) {
-        if (argc != 3) {
+    // main.exe iniciarJuego <archivo_configuracion>
+    if (strcmp(args[1], "iniciarJuego") == 0) {
+        if (n_args != 3) {
             printf("Error: iniciarJuego requiere un archivo de configuración\n");
-            mostrarAyuda(argv[0]);
+            mostrarAyuda();
             return 1;
         }
-        iniciarJuego(argv[2]);
-    } else if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
-        mostrarAyuda(argv[0]);
-    } else {
-        printf("Error: Acción desconocida '%s'\n", argv[1]);
-        mostrarAyuda(argv[0]);
+        return iniciarJuego(args[2]);
+    }
+
+    // main.exe listaHistorial
+    if (strcmp(args[1], "listaHistorial") == 0) {
         return 1;
     }
 
-    return 0;
+    // main.exe buscarPartida <id_partida>
+    if (strcmp(args[1], "buscarPartida") == 0) {
+        return 1;
+    }
+
+    // main.exe ayuda
+    if (strcmp(args[1], "ayuda") == 0)
+        return mostrarAyuda();
+    
+    printf("Error: Acción desconocida '%s'\n", args[1]);
+    mostrarAyuda();
+    return 1;
+
 }

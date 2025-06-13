@@ -9,7 +9,7 @@ HEIGHT = 720
 
 DEV = True
 
-GRID_SIZE = (10, 10)
+GRID_SIZE = (15, 15)
 
 class Grid:
 
@@ -18,9 +18,9 @@ class Grid:
     preview_boat = None
     preview_pos = None
 
-    def __init__(self, size, width, height):
+    def __init__(self, size, width, height, boats=[]):
         self.size = size
-        self.boats = []
+        self.boats = boats
 
         self.width = width
         self.height = height
@@ -31,7 +31,6 @@ class Grid:
         self.grid_width = (self.cell_size * self.size[0]) + (self.margin * (self.size[0] - 1))
         self.grid_height = (self.cell_size * self.size[1]) + (self.margin * (self.size[1] - 1))
         
-
     def add_boat(self, boat):
         boat['id'] = len(self.boats) + 1
         self.boats.append(boat)
@@ -135,16 +134,18 @@ class Grid:
 
 class ObjectPanel:
 
-    img_size = (40, 40)
+    img_size = (50, 50)
 
     def __init__(self, game, width, height):
         self.game = game
         self.width = width
         self.height = height
+
+        assets = self.game.assets
         self.items = {
-            'bomb': {'id': 1, 'quantity': 1, 'image': 'bomb.png'},
-            'spyglass': {'id': 2, 'quantity': 1, 'image': 'spyglass.png'},
-            'torpedo': {'id': 3, 'quantity': 1, 'image': 'torpedo.png'}
+            'bomb': {'id': 1, 'quantity': 1, 'image': assets.images["bomb"]},
+            'spyglass': {'id': 2, 'quantity': 1, 'image': assets.images["spyglass"]},
+            'torpedo': {'id': 3, 'quantity': 1, 'image': assets.images["torpedo"]}
         }
         self.selector_rects = {}  # Store selector rectangles for click detection
         self.setup()
@@ -152,33 +153,37 @@ class ObjectPanel:
     def setup(self):
         # Load images
         for item in self.items.values():
-            item['surface'] = pg.image.load(f"assets/img/{item['image']}").convert_alpha()
-            # Scale images to fit in grid cells
-            item['surface'] = pg.transform.scale(item['surface'], self.img_size)
+            item['surface'] = pg.transform.scale(item['image'], self.img_size)
 
-    def draw_quantity_selector(self, screen, x, y, quantity, item_name):
+    def draw_quantity_selector(self, screen, pos, size, quantity, item_name):
+
+        x, y = pos
+        w, h = size
+
         # Draw quantity background
-        selector_rect = pg.Rect(x, y, self.width // 3, 30)
-        pg.draw.rect(screen, (10, 70, 135), selector_rect)
+        selector_rect = pg.Rect(x, y, w, h)
+        pg.draw.rect(screen, (10, 100, 180), selector_rect)
         
         # Draw minus button
-        minus_rect = pg.Rect(x + 5, y + 5, 15, 15)
-        pg.draw.rect(screen, (13, 82, 154), minus_rect, border_radius=3)
+        minus_rect = pg.Rect(x, y, w // 3, h)
+        pg.draw.rect(screen, (7, 41, 77), minus_rect)
         font = pg.font.Font(None, 20)
 
         minus_text = font.render("-", True, (255, 255, 255))
-        
-        screen.blit(minus_text, (x + 10, y + 5))
+        minus_text_rect = minus_text.get_rect(center=minus_rect.center)
+        screen.blit(minus_text, minus_text_rect)
         
         # Draw quantity
         quantity_text = font.render(str(quantity), True, (255, 255, 255))
-        screen.blit(quantity_text, (x + 30, y + 5))
+        q_rect = quantity_text.get_rect(center=selector_rect.center)
+        screen.blit(quantity_text, q_rect)
         
         # Draw plus button
-        plus_rect = pg.Rect(x + 48, y + 5, 15, 15)
-        pg.draw.rect(screen, (13, 82, 154), plus_rect, border_radius=3)
+        plus_rect = pg.Rect(x + w - w // 3, y, w // 3, h)
+        pg.draw.rect(screen, (7, 41, 77), plus_rect)
         plus_text = font.render("+", True, (255, 255, 255))
-        screen.blit(plus_text, (x + 53, y + 5))
+        plus_text_rect = plus_text.get_rect(center=plus_rect.center)
+        screen.blit(plus_text, plus_text_rect)
         
         # Store rectangles for click detection
         self.selector_rects[item_name] = {
@@ -189,13 +194,17 @@ class ObjectPanel:
     def handle_click(self, pos):
         # Convert global position to local panel position
         local_pos = (pos[0] - self.panel_x, pos[1] - self.panel_y)
-        
+        audio = self.game.assets.audio["music"]
+        mixer = pg.mixer
+
         # Check each item's selector buttons
         for item_name, rects in self.selector_rects.items():
             if rects['minus'].collidepoint(local_pos):
                 if self.items[item_name]['quantity'] > 0:
                     self.items[item_name]['quantity'] -= 1
-                    pg.mixer.Sound(self.game.assets.audio["music"]["hover"]).play()
+                    mixer.Sound(audio["hover"]).play()
+                else:
+                    mixer.Sound(audio["deny"]).play()
             elif rects['plus'].collidepoint(local_pos):
                 self.items[item_name]['quantity'] += 1
                 pg.mixer.Sound(self.game.assets.audio["music"]["hover"]).play()
@@ -210,7 +219,7 @@ class ObjectPanel:
         
         # Calculate grid layout
         cell_width = self.width // 3
-        cell_height = 100
+        cell_height = 90
         padding = 10
         
         # Draw items in grid
@@ -235,9 +244,10 @@ class ObjectPanel:
             surf.blit(item['surface'], (item_x, item_y))
             
             # Draw quantity selector
-            selector_x = box_rect.left  # Center the selector (80px wide)
-            selector_y = item_y + box_rect.height - 30
-            self.draw_quantity_selector(surf, selector_x, selector_y, item['quantity'], item_name)
+            h = 20
+            selector_size = (box_rect.width, h)
+            selector_pos = (box_rect.left, item_y + box_rect.height - h)
+            self.draw_quantity_selector(surf, selector_pos, selector_size, item['quantity'], item_name)
         
         screen.blit(surf, (x, y))
 
@@ -248,7 +258,6 @@ class Scene:
 
     def __init__(self, game):
         self.game = game
-        self.setup()
 
     def setup(self):
         pass
@@ -267,13 +276,13 @@ class MenuScene(Scene):
         self.ui.update(screen)
 
 class MatchScene(Scene):
-    def setup(self):
-        self.grid = None
-        self.ui = UIManager(self.game)
-        action = lambda: self.game.goto_scene("setup")
-        self.ui.add_button( "back", (100, 40), action, "Back", center=(WIDTH - 60, HEIGHT - 30))
+    def setup(self, grid):
+        self.init_match(grid)
 
     def save_config(self):
+
+        grid = self.gridA
+
         # Clean cache directory
         if os.path.exists("cache"):
             shutil.rmtree("cache")
@@ -284,13 +293,13 @@ class MatchScene(Scene):
             f.write(f"{self.id}\n")
             
             # Write grid size
-            f.write(f"{self.grid.size[0]} {self.grid.size[1]}\n")
+            f.write(f"{grid.size[0]} {grid.size[1]}\n")
             
             # Create and write the grid state
-            grid_state = [[0 for _ in range(self.grid.size[1])] for _ in range(self.grid.size[0])]
+            grid_state = [[0 for _ in range(grid.size[1])] for _ in range(grid.size[0])]
             
             # Fill in boat positions
-            for boat in self.grid.boats:
+            for boat in grid.boats:
                 x, y = boat['pos']
                 for i in range(boat['size']):
                     if boat.get('direction', 'h') == 'h':  # Default to horizontal if not set
@@ -313,22 +322,50 @@ class MatchScene(Scene):
     def start_backend(self):
 
         if DEV or not os.path.exists("main.exe"):
-            subprocess.run(["gcc", "main.c", "-o", "main.exe"], )
+            subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"])
 
         result = subprocess.run(["./main.exe", "iniciarJuego", f"{self.id}.txt"], capture_output=True, text=True)
         print(result.stdout)
         print(result.stderr)
 
     def init_match(self, grid):
-        self.grid = grid
+
+        margin = WIDTH // 20
+        self.gridA = Grid(GRID_SIZE, WIDTH // 2 - margin*2, HEIGHT * 0.9, boats=[])
+        self.gridB = Grid(GRID_SIZE, HEIGHT // 2 - margin*2, HEIGHT * 0.8, boats=grid.boats)
+
+        self.fog_list = []
+        x_step = self.gridA.grid_width // 5
+        y_step = self.gridA.grid_height // 5
+        for i in range(5):
+            for j in range(5):
+                x = x_step * i
+                y = y_step * j
+
+                self.fog_list.append(pg.Vector2(x, y))
+
         self.id = str(uuid.uuid4())[:5]
         self.save_config()
         self.start_backend()
 
+    def draw_fog(self, screen, box):
+
+        # cloud = self.game.assets.animations["fog_cloud"]
+
+        fog_surf = pg.Surface(box.size, pg.SRCALPHA)
+        fog_surf.fill((0, 0, 0, 100))
+        screen.blit(fog_surf, box.topleft)
+
     def update(self, screen):
         # Draw the grid
-        self.grid.draw(screen, WIDTH / 2, HEIGHT / 2)
-        self.ui.update(screen)
+        posA = pg.Vector2(2 * WIDTH / 3, HEIGHT / 2)
+        posB = pg.Vector2(WIDTH / 4, HEIGHT / 3)
+
+        self.gridA.draw(screen, *posA)
+        self.gridB.draw(screen, *posB)
+
+        gridA_rect = pg.Rect(*self.gridA.start_pos, self.gridA.grid_width, self.gridA.grid_width)
+        self.draw_fog(screen, gridA_rect)
 
 class SetupScene(Scene):
     def setup(self):
@@ -528,16 +565,14 @@ class Game:
         self.running = True
         pg.mixer.init()
         self.win_size = win_size
+        self.frame = 0
 
         self.event_manager = EventManager(self)
         self.assets = AssetManager()
 
     def goto_scene(self, scene_name, *args, **kwargs):
         self.current_scene = self.scenes[scene_name]
-        if scene_name == "match":
-            self.current_scene.init_match(*args, **kwargs)
-        else:
-            self.current_scene.setup(*args, **kwargs)
+        self.current_scene.setup(*args, **kwargs)
         
     def setup(self):
         self.assets.load()
@@ -550,6 +585,7 @@ class Game:
             "match": MatchScene(self)
         }
         self.current_scene = self.scenes["menu"]
+        self.current_scene.setup()
 
     def update(self, screen):
         self.event_manager.update()
@@ -558,6 +594,7 @@ class Game:
         self.current_scene.update(screen)
         if self.current_scene.ui:
             self.current_scene.ui.update(screen)
+        self.frame += 1
 
         return self.running
 
@@ -597,18 +634,44 @@ class EventManager:
             if ev.type == pg.MOUSEBUTTONUP:
                 self.is_clicking = True
 
+class AnimatedSprite:
+    def __init__(self, img, size, n_frames):
+        self.img = pg.image.load(img).convert()
+        self.size = size
+        self.n_frames = n_frames
+
+        self.columns = self.img.get_width() // self.size[0]
+        self.rows = self.img.get_height() // self.size[1]
+
+    def get_frame(self, frame):
+        frame = frame % self.n_frames  # Ensure frame is within bounds
+        row = frame // self.columns    # Calculate row based on columns
+        col = frame % self.columns     # Calculate column
+        x = col * self.size[0]         # Calculate x position
+        y = row * self.size[1]         # Calculate y position
+        return self.img.subsurface(x, y, self.size[0], self.size[1])
+
+
 class AssetManager:
     def load(self):
         self.audio = {
             "music": {
                 "main": "assets/audio/menu.mp3",
                 "hover": "assets/audio/hover.wav",
-                "create": "assets/audio/create.wav"
+                "create": "assets/audio/create.wav",
+                "deny": "assets/audio/deny.wav"
             }
         }
 
         self.images = {
-            "menu": pg.image.load("assets/img/menu.png").convert()
+            "menu": pg.image.load("assets/img/menu.png").convert_alpha(),
+            "bomb": pg.image.load("assets/img/bomb.png").convert_alpha(),
+            "spyglass": pg.image.load("assets/img/spyglass.png").convert_alpha(),
+            "torpedo": pg.image.load("assets/img/torpedo.png").convert_alpha()
+        }
+
+        self.animations = {
+            "fog_cloud": AnimatedSprite("assets/anim/fog-cloud.png", (1280, 900), 37),
         }
 
 class Engine:
