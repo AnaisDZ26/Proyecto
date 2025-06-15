@@ -69,7 +69,7 @@ void definirPosBot(Barco *b)
     b->x = rand() % GRID;
     b->y = rand() % GRID;
 
-    printf("Barco #%d posicionado en [%d][%d]\n", b->x, b->y);
+    printf("Barco posicionado en [%d][%d]\n", b->x, b->y);
 }
 
 int main(int n_args, char *args[])
