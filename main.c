@@ -3,18 +3,29 @@
 #include <string.h>
 
 #define MAX_GRID_SIZE 20 // (?)
-#define ID_LENGTH 5
+#define ID_LENGTH 5      // l
+#define GRID 11
 
-typedef struct {
-    char id[ID_LENGTH + 1];  // +1 for null terminator
+/*struct provisorio para la "funcion" que hice*/
+typedef struct
+{
+    int x;
+    int y;
+} Barco;
+
+typedef struct
+{
+    char id[ID_LENGTH + 1]; // +1 for null terminator
     int width;
     int height;
     int grid[MAX_GRID_SIZE][MAX_GRID_SIZE]; // CAMBIAR POR ESTRUCTURA (?)
 } Partida;
 
-Partida* leerConfiguracion(const char* filename) {
-    FILE* file = fopen(filename, "r");
-    if (!file) {
+Partida *leerConfiguracion(const char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (!file)
+    {
         printf("Error: No se pudo abrir el archivo %s\n", filename);
         return NULL;
     }
@@ -23,12 +34,14 @@ Partida* leerConfiguracion(const char* filename) {
     return NULL;
 }
 
-int iniciarJuego(const char* filename) {
+int iniciarJuego(const char *filename)
+{
     char fullpath[256];
     snprintf(fullpath, sizeof(fullpath), "cache/%s", filename);
-    
-    Partida* partida = leerConfiguracion(fullpath);
-    if (!partida) {
+
+    Partida *partida = leerConfiguracion(fullpath);
+    if (!partida)
+    {
         printf("Error: No se pudo cargar la configuración del juego\n");
         return 1;
     }
@@ -39,7 +52,8 @@ int iniciarJuego(const char* filename) {
     return 0;
 }
 
-int mostrarAyuda() {
+int mostrarAyuda()
+{
     printf("Battleship Game - Ayuda\n");
     printf("======================\n\n");
     printf("Uso: <accion> [parametros]\n\n");
@@ -48,16 +62,28 @@ int mostrarAyuda() {
     return 0;
 }
 
-int main(int n_args, char* args[]) {
+void definirPosBot(Barco *b)
+{
+    b->x = rand() % GRID;
+    b->y = rand() % GRID;
 
-    if (n_args < 2) {
+    printf("Barco #%d posicionado en [%d][%d]\n", b->x, b->y);
+}
+
+int main(int n_args, char *args[])
+{
+
+    if (n_args < 2)
+    {
         printf("Error: No se proporcionó ninguna acción\n");
         return mostrarAyuda();
     }
 
     // main.exe iniciarJuego <archivo_configuracion>
-    if (strcmp(args[1], "iniciarJuego") == 0) {
-        if (n_args != 3) {
+    if (strcmp(args[1], "iniciarJuego") == 0)
+    {
+        if (n_args != 3)
+        {
             printf("Error: iniciarJuego requiere un archivo de configuración\n");
             mostrarAyuda();
             return 1;
@@ -66,21 +92,22 @@ int main(int n_args, char* args[]) {
     }
 
     // main.exe listaHistorial
-    if (strcmp(args[1], "listaHistorial") == 0) {
+    if (strcmp(args[1], "listaHistorial") == 0)
+    {
         return 1;
     }
 
     // main.exe buscarPartida <id_partida>
-    if (strcmp(args[1], "buscarPartida") == 0) {
+    if (strcmp(args[1], "buscarPartida") == 0)
+    {
         return 1;
     }
 
     // main.exe ayuda
     if (strcmp(args[1], "ayuda") == 0)
         return mostrarAyuda();
-    
+
     printf("Error: Acción desconocida '%s'\n", args[1]);
     mostrarAyuda();
     return 1;
-
 }
