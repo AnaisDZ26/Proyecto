@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_GRID_SIZE 20 // (?)
 #define ID_LENGTH 5      // l
@@ -64,6 +65,7 @@ int mostrarAyuda()
 
 void definirPosBot(Barco *b)
 {
+    srand(time(NULL));
     b->x = rand() % GRID;
     b->y = rand() % GRID;
 
