@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "TDAS/list.h"
+#include "TDAS/map.h"
+#include "TDAS/stack.h"
 
 #define MAX_GRID_SIZE 20 // (?)
 #define ID_LENGTH 5      // l
@@ -21,6 +24,18 @@ typedef struct
     int height;
     int grid[MAX_GRID_SIZE][MAX_GRID_SIZE]; // CAMBIAR POR ESTRUCTURA (?)
 } Partida;
+
+typedef struct
+{
+    int id; // 1 - Bomba. 2 - Catalejo. 3 - Torpedo
+    int amount;
+} Objeto;
+
+typedef struct {
+    int CoorX;
+    int CoorY;
+    int TypeMov; // 4 - Ataque. 5 - Usar Objeto.
+} Movimiento;
 
 Partida *leerConfiguracion(const char *filename)
 {
