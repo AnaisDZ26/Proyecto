@@ -59,13 +59,7 @@ class Grid:
         
         # Create a surface for the boat with alpha channel
         boat_surf = pg.Surface((boat_rect.width, boat_rect.height), pg.SRCALPHA)
-        
-        # Draw shadow
-        shadow_v = pg.Vector2(1, 2)
-        shadow_color = (3, 33, 64, 128 if is_preview else 255)
         boat_color = (151, 87, 43, 128 if is_preview else 255)
-        
-        pg.draw.rect(boat_surf, shadow_color, pg.Rect(shadow_v.x, shadow_v.y, boat_rect.width, boat_rect.height), border_radius=5)
         pg.draw.rect(boat_surf, boat_color, pg.Rect(0, 0, boat_rect.width, boat_rect.height), border_radius=5)
         
         # Draw the boat surface onto the screen
@@ -108,7 +102,6 @@ class Grid:
         self.start_pos = screen_middle - grid_middle
 
         grid_surf = pg.Surface((self.grid_width, self.grid_height), pg.SRCALPHA)
-        
 
         n, m = self.size
         # Draw cells
@@ -143,9 +136,9 @@ class ObjectPanel:
 
         assets = self.game.assets
         self.items = {
-            'bomb': {'id': 1, 'quantity': 1, 'image': assets.images["bomb"]},
-            'spyglass': {'id': 2, 'quantity': 1, 'image': assets.images["spyglass"]},
-            'torpedo': {'id': 3, 'quantity': 1, 'image': assets.images["torpedo"]}
+            'bomb': {'id': 1, 'quantity': 1, 'image': assets.images["bomb"], 'info': "Bomba\nPuede destruir casillas en un rango de 3x3"},
+            'spyglass': {'id': 2, 'quantity': 1, 'image': assets.images["spyglass"], 'info': "Catalejo\nPuede ver casillas en un rango de 3x3"},
+            'torpedo': {'id': 3, 'quantity': 1, 'image': assets.images["torpedo"], 'info': "Torpedo\nEs lanzado en línea recta desde el borde para destruir la primera casilla que encuentre"}
         }
         self.selector_rects = {}  # Store selector rectangles for click detection
         self.setup()
@@ -242,6 +235,10 @@ class ObjectPanel:
             
             # Draw item image
             surf.blit(item['surface'], (item_x, item_y))
+
+            mouse_relative_pos = pg.Vector2(pg.mouse.get_pos()) - pg.Vector2(x, y)
+            if box_rect.collidepoint(mouse_relative_pos):
+                self.game.info_box.add_message(f"{item['info']}")
             
             # Draw quantity selector
             h = 20
@@ -281,7 +278,7 @@ class MatchScene(Scene):
 
     def save_config(self):
 
-        grid = self.gridA
+        grid = self.gridB
 
         # Clean cache directory
         if os.path.exists("cache"):
@@ -349,9 +346,6 @@ class MatchScene(Scene):
         self.start_backend()
 
     def draw_fog(self, screen, box):
-
-        # cloud = self.game.assets.animations["fog_cloud"]
-
         fog_surf = pg.Surface(box.size, pg.SRCALPHA)
         fog_surf.fill((0, 0, 0, 100))
         screen.blit(fog_surf, box.topleft)
@@ -378,7 +372,7 @@ class SetupScene(Scene):
         self.ui = UIManager(self.game)
 
         action = lambda: self.start_match()
-        self.ui.add_button( "start", (120, 40), action, "Start Game", center=(WIDTH - 70, HEIGHT - 30))
+        self.ui.add_button( "start", (120, 40), action, "Comenzar", center=(WIDTH - 70, HEIGHT - 30))
 
         self.game.event_manager.add_action_key(pg.K_r, self.rotate_selected_boat)
 
@@ -509,6 +503,77 @@ class SetupScene(Scene):
                 
                 pos.y += size + margin
 
+class InfoBox:
+
+    margin = 10
+    padding = 10
+    opacity = 100
+    message = []
+
+    def __init__(self, game, width, height):
+        self.game = game
+        self.width = width
+        self.height = height
+
+    def add_message(self, message):
+        self.message.append(message)
+
+    def wrap_text(self, text, font, max_width):
+        # First split by newlines
+        paragraphs = text.split('\n')
+        all_lines = []
+        
+        for paragraph in paragraphs:
+            words = paragraph.split(' ')
+            current_line = []
+            
+            for word in words:
+                # Test if adding the word exceeds the width
+                test_line = ' '.join(current_line + [word])
+                test_width = font.size(test_line)[0]
+                
+                if test_width <= max_width - (self.padding * 2):
+                    current_line.append(word)
+                else:
+                    if current_line:
+                        all_lines.append(' '.join(current_line))
+                    current_line = [word]
+            
+            if current_line:
+                all_lines.append(' '.join(current_line))
+            
+        return all_lines
+
+    def draw(self, screen):
+        if not self.message:
+            return
+
+        x = self.margin
+        y = screen.get_height() - self.height - self.margin
+
+        surf = pg.Surface((self.width, self.height), pg.SRCALPHA)
+        surf.fill((0, 0, 0, self.opacity))
+
+        font = pg.font.Font(None, 24)
+        current_y = self.padding
+        
+        for message in self.message:
+            # Wrap the text
+            wrapped_lines = self.wrap_text(message, font, self.width)
+            
+            # Draw each line
+            for line in wrapped_lines:
+                text = font.render(line, True, (255, 255, 255))
+                surf.blit(text, (self.padding, current_y))
+                current_y += text.get_height() + 2  # Add small spacing between lines
+                
+                # If we exceed the height, stop drawing
+                if current_y > self.height - self.padding:
+                    break
+
+        screen.blit(surf, (x, y))
+        self.message = []
+
 class UIManager:
     def __init__(self, game):
         self.game = game
@@ -569,6 +634,7 @@ class Game:
 
         self.event_manager = EventManager(self)
         self.assets = AssetManager()
+        self.info_box = InfoBox(self, WIDTH // 3, HEIGHT // 5 )
 
     def goto_scene(self, scene_name, *args, **kwargs):
         self.current_scene = self.scenes[scene_name]
@@ -595,6 +661,8 @@ class Game:
         if self.current_scene.ui:
             self.current_scene.ui.update(screen)
         self.frame += 1
+
+        self.info_box.draw(screen)
 
         return self.running
 
