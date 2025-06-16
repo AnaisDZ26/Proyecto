@@ -491,6 +491,33 @@ Partida *leerConfiguracion(const char *archivo)
         return NULL;
     }
 
+    char buffer[51];
+    int actual = 0;
+    while (fgets(buffer, sizeof(buffer), file)) {
+        if (actual == 0) {
+            actual++;
+            continue;
+        }
+
+        int id, cantidad;
+        if(sscanf(buffer, "%d %d", &id, &cantidad) == 2){
+            for(int i = 0; i < cantidad; i++)
+            {
+                int *id_ptr = malloc(sizeof(int));
+                *id_ptr = id;
+                list_pushBack(usuario->objetos, id_ptr);
+            }
+        }
+        actual++;
+    }
+
+    int *id_ptr = list_first(usuario->objetos);
+    while (id_ptr != NULL) {
+        printf("Objeto Guardado: %d\n", *id_ptr);
+        id_ptr = list_next(usuario->objetos);
+    }
+    printf("\n");
+
     Tablero *tablero_bot = inicializarTableroBot(usuario->tablero->barcos, usuario->tablero->ancho, usuario->tablero->alto);
     if (!tablero_bot)
     {
@@ -530,6 +557,9 @@ int iniciarJuego(const char *archivo)
     snprintf(fullpath, sizeof(fullpath), "cache/%s", archivo);
 
     Partida *partida = leerConfiguracion(fullpath);
+    //Map *Historial = map_create(Historial->is_equal);
+    //Stack *movement = stack_create();                 // CREAR EL MAPA HISTORIAL Y AGREGARLE LA PILA SEGUN LA ID DEL JUGADOR
+    //map_insert(Historial, partida->id, movement); 
     if (!partida)
     {
         printf("Error: No se pudo cargar la configuración del juego\n");
