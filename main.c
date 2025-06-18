@@ -282,7 +282,7 @@ Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List
     return barco;
 }
 
-void *UsarObjeto(int ID, int CoorX, int CoorY, Tablero *TableroRival, int Orientacion){
+void usarObjeto(int ID, int CoorX, int CoorY, Tablero *TableroRival, int Orientacion){
 
     if (!TableroRival || !TableroRival->valores) {
         printf("ERROR: Tablero no encontrado\n");
@@ -615,17 +615,25 @@ int iniciarJuego(const char *archivo)
     snprintf(fullpath, sizeof(fullpath), "cache/%s", archivo);
 
     Partida *partida = leerConfiguracion(fullpath);
-    //Map *Historial = map_create(Historial->is_equal);
-    //Stack *movement = stack_create();                 // CREAR EL MAPA HISTORIAL Y AGREGARLE LA PILA SEGUN LA ID DEL JUGADOR
-    //map_insert(Historial, partida->id, movement); 
     if (!partida)
     {
         printf("Error: No se pudo cargar la configuración del juego\n");
         return 1;
     }
 
-    printf("Partida iniciada con ID: %s\n", partida->id);
-    verEstadoPartida(partida);
+    //Map *Historial = map_create(Historial->is_equal);
+    //Stack *movement = stack_create();                 // CREAR EL MAPA HISTORIAL Y AGREGARLE LA PILA SEGUN LA ID DEL JUGADOR
+    //map_insert(Historial, partida->id, movement); 
+
+    // printf("Partida iniciada con ID: %s\n", partida->id);
+    // verEstadoPartida(partida);
+
+    char buffer[256];
+    while(fgets(buffer, sizeof(buffer), stdin))
+    {
+        printf("%s FIN\n", buffer);
+        fflush(stdout);
+    }
 
     free(partida);
     return 0;

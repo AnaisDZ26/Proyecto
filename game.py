@@ -15,10 +15,9 @@ class Grid:
 
     cell_color = (10, 70, 135)
     hover_color = (10, 100, 180)
-    preview_boat = None
-    preview_pos = None
 
-    def __init__(self, size, width, height, boats=[]):
+    def __init__(self, scene, size, width, height, boats=[]):
+        self.scene = scene
         self.size = size
         self.boats = boats
 
@@ -31,17 +30,7 @@ class Grid:
         self.grid_width = (self.cell_size * self.size[0]) + (self.margin * (self.size[0] - 1))
         self.grid_height = (self.cell_size * self.size[1]) + (self.margin * (self.size[1] - 1))
         
-    def add_boat(self, boat):
-        boat['id'] = len(self.boats) + 1
-        self.boats.append(boat)
-        self.preview_boat = None
-        self.preview_pos = None
-
-    def preview(self, boat):
-        self.preview_boat = boat
-        if 'direction' not in self.preview_boat:
-            self.preview_boat['direction'] = 'h'  # Default to horizontal if not set
-
+    
     def draw_boat(self, screen, boat, is_preview=False):
         
         padding = 4
@@ -75,25 +64,12 @@ class Grid:
         # Draw cell
         pg.draw.rect(screen, color, rect, border_radius=5)
 
-        if self.preview_boat and rect.collidepoint(mouse_pos):
-            # Check if boat would exceed grid boundaries
-            boat_size = self.preview_boat['size']
-            direction = self.preview_boat.get('direction', 'h')
-            
-            # Check if boat fits in current direction, if not try the other direction
-            if direction == 'h' and i + boat_size > self.size[0]:
-                direction = 'v'
-            elif direction == 'v' and j + boat_size > self.size[1]:
-                direction = 'h'
-            self.preview_boat['direction'] = direction
-                
-            # Set preview position if boat fits in either direction
-            if (direction == 'h' and i + boat_size <= self.size[0]) or \
-               (direction == 'v' and j + boat_size <= self.size[1]):
-                self.preview_boat['direction'] = direction
-                self.preview_pos = (i, j)
+        return rect
+    
+    def draw(self, surf):
+        pass
 
-    def draw(self, screen, center_x, center_y):
+    def update(self, screen, center_x, center_y):
 
         self.preview_pos = None
 
@@ -114,7 +90,50 @@ class Grid:
             if boat['pos'] is not None:
                 self.draw_boat(grid_surf, boat)
 
-        # Draw preview boat if we have a position
+        self.draw(grid_surf)
+        screen.blit(grid_surf, self.start_pos)
+
+class SetupGrid(Grid):
+    
+    preview_boat = None
+    preview_pos = None
+
+    def add_boat(self, boat):
+        boat['id'] = len(self.boats) + 1
+        self.boats.append(boat)
+        self.preview_boat = None
+        self.preview_pos = None
+
+    def preview(self, boat):
+        self.preview_boat = boat
+        if 'direction' not in self.preview_boat:
+            self.preview_boat['direction'] = 'h'  # Default to horizontal if not set
+
+    def draw_cell(self, screen, i, j):
+        rect = super().draw_cell(screen, i, j)
+
+        mouse_pos = pg.mouse.get_pos() - self.start_pos
+        rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
+        if self.preview_boat and rect.collidepoint(mouse_pos):
+            # Check if boat would exceed grid boundaries
+            boat_size = self.preview_boat['size']
+            direction = self.preview_boat.get('direction', 'h')
+            
+            # Check if boat fits in current direction, if not try the other direction
+            if direction == 'h' and i + boat_size > self.size[0]:
+                direction = 'v'
+            elif direction == 'v' and j + boat_size > self.size[1]:
+                direction = 'h'
+            self.preview_boat['direction'] = direction
+                
+            # Set preview position if boat fits in either direction
+            if (direction == 'h' and i + boat_size <= self.size[0]) or \
+               (direction == 'v' and j + boat_size <= self.size[1]):
+                self.preview_boat['direction'] = direction
+                self.preview_pos = (i, j)
+
+    def draw(self, grid_surf):
+         # Draw preview boat if we have a position
         if self.preview_boat and self.preview_pos:
             preview_boat = self.preview_boat.copy()
             preview_boat['pos'] = self.preview_pos
@@ -123,7 +142,35 @@ class Grid:
                 preview_boat['direction'] = 'h'
             self.draw_boat(grid_surf, preview_boat, is_preview=True)
 
-        screen.blit(grid_surf, self.start_pos)
+class EnemyGrid(Grid):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.selected_target = None
+        self.target_img = self.scene.game.assets.images["target"]
+        target_size = int(self.cell_size * 0.8)
+        self.target_img = pg.transform.smoothscale(self.target_img, (target_size, target_size))
+
+    def handle_click(self, pos):
+        # Convert mouse position to grid cell indices
+        mouse_vec = pg.Vector2(pos) - self.start_pos
+        for i in range(self.size[0]):
+            for j in range(self.size[1]):
+                rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
+                if rect.collidepoint(mouse_vec):
+                    self.selected_target = (i, j)
+                    return
+
+    def clear_target(self):
+        self.selected_target = None
+
+    def draw_cell(self, screen, i, j):
+        super().draw_cell(screen, i, j)
+        if self.selected_target == (i, j):
+            rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
+            # Center the target image in the cell
+            img_rect = self.target_img.get_rect(center=rect.center)
+            screen.blit(self.target_img, img_rect)    
 
 class ObjectPanel:
 
@@ -252,6 +299,7 @@ class Scene:
 
     buttons = {}
     ui = None
+    handle_click = None
 
     def __init__(self, game):
         self.game = game
@@ -275,6 +323,9 @@ class MenuScene(Scene):
 class MatchScene(Scene):
     def setup(self, grid):
         self.init_match(grid)
+
+    def handle_click(self, pos):
+        self.gridA.handle_click(pos)
 
     def save_config(self):
 
@@ -321,15 +372,15 @@ class MatchScene(Scene):
         if DEV or not os.path.exists("main.exe"):
             subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"])
 
-        result = subprocess.run(["./main.exe", "iniciarJuego", f"{self.id}.txt"], capture_output=True, text=True)
-        print(result.stdout)
-        print(result.stderr)
+        pipe = subprocess.PIPE
+        self.proc = subprocess.Popen(["./main.exe", "iniciarJuego", f"{self.id}.txt"], stdin=pipe, stdout=pipe, stderr=pipe, text=True)
+
 
     def init_match(self, grid):
 
         margin = WIDTH // 20
-        self.gridA = Grid(GRID_SIZE, WIDTH // 2 - margin*2, HEIGHT * 0.9, boats=[])
-        self.gridB = Grid(GRID_SIZE, HEIGHT // 2 - margin*2, HEIGHT * 0.8, boats=grid.boats)
+        self.gridA = EnemyGrid(self, GRID_SIZE, WIDTH // 2 - margin*2, HEIGHT * 0.9, boats=[])
+        self.gridB = Grid(self, GRID_SIZE, HEIGHT // 2 - margin*2, HEIGHT * 0.8, boats=grid.boats)
 
         self.fog_list = []
         x_step = self.gridA.grid_width // 5
@@ -344,6 +395,24 @@ class MatchScene(Scene):
         self.id = str(uuid.uuid4())[:5]
         self.save_config()
         self.start_backend()
+        # Add 'Terminar Turno' button
+        self.ui = UIManager(self.game)
+        action = self.end_turn
+        self.ui.add_button("end_turn", (180, 50), action, "Terminar Turno", topleft=(WIDTH-200, HEIGHT-70))
+        self.turn_ended = False
+
+    def end_turn(self):
+        if self.gridA.selected_target is not None:
+            # Here you would apply the action (e.g., send to backend, update state, etc.)
+            # print(f"4 {self.gridA.selected_target[0]} {self.gridA.selected_target[1]}")
+            self.proc.stdin.write(f"4 {self.gridA.selected_target[0]} {self.gridA.selected_target[1]}\n")
+            self.proc.stdin.flush()
+
+            print(self.proc.stdout.readline())
+            
+            self.gridA.clear_target()
+            self.turn_ended = True
+            # You can add more logic here for turn switching
 
     def draw_fog(self, screen, box):
         fog_surf = pg.Surface(box.size, pg.SRCALPHA)
@@ -355,15 +424,25 @@ class MatchScene(Scene):
         posA = pg.Vector2(2 * WIDTH / 3, HEIGHT / 2)
         posB = pg.Vector2(WIDTH / 4, HEIGHT / 3)
 
-        self.gridA.draw(screen, *posA)
-        self.gridB.draw(screen, *posB)
+        self.gridA.update(screen, *posA)
+        self.gridB.update(screen, *posB)
 
         gridA_rect = pg.Rect(*self.gridA.start_pos, self.gridA.grid_width, self.gridA.grid_width)
         self.draw_fog(screen, gridA_rect)
+        # Handle click for targeting
+        if self.game.event_manager.is_clicking and not self.turn_ended:
+            mouse_pos = pg.mouse.get_pos() - self.gridB.start_pos
+            for i in range(self.gridB.size[0]):
+                for j in range(self.gridB.size[1]):
+                    rect = pg.Rect(i * (self.gridB.cell_size + self.gridB.margin), j * (self.gridB.cell_size + self.gridB.margin), self.gridB.cell_size, self.gridB.cell_size)
+                    if rect.collidepoint(mouse_pos):
+                        self.gridB.handle_click(i, j)
+
+        self.ui.update(screen)
 
 class SetupScene(Scene):
     def setup(self):
-        self.grid = Grid(GRID_SIZE, WIDTH, HEIGHT * 0.8)
+        self.grid = SetupGrid(self, GRID_SIZE, WIDTH, HEIGHT * 0.8)
         self.object_panel = ObjectPanel(self.game, WIDTH // 5, HEIGHT * 0.8)
 
         new_boat = lambda size: {'size': size, 'pos': None, 'direction': 'h', 'selected': False }
@@ -451,7 +530,7 @@ class SetupScene(Scene):
         return False
 
     def update(self, screen):
-        self.grid.draw(screen, WIDTH / 2, HEIGHT / 2) 
+        self.grid.update(screen, WIDTH / 2, HEIGHT / 2) 
         rect = pg.Rect(0, 0, 80, 2*HEIGHT//3)
         rect.center = (100, HEIGHT / 2)
         pg.draw.rect(screen, (12, 139, 221), rect, border_radius=5)
@@ -686,6 +765,8 @@ class EventManager:
         scene = self.game.current_scene
         if scene.ui:
             scene.ui.mousePressed(pos)
+        if scene.handle_click:
+            scene.handle_click(pos)
 
     def update(self):
         self.is_clicking = False
@@ -735,7 +816,8 @@ class AssetManager:
             "menu": pg.image.load("assets/img/menu.png").convert_alpha(),
             "bomb": pg.image.load("assets/img/bomb.png").convert_alpha(),
             "spyglass": pg.image.load("assets/img/spyglass.png").convert_alpha(),
-            "torpedo": pg.image.load("assets/img/torpedo.png").convert_alpha()
+            "torpedo": pg.image.load("assets/img/torpedo.png").convert_alpha(),
+            "target": pg.image.load("assets/img/target.png").convert_alpha()
         }
 
         self.animations = {
