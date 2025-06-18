@@ -4,7 +4,7 @@
 
 - 1: Bomba
 - 2: Catalejo
-- 3: Torpedo
+- 3: Torpedo -> Orientacion: 6 (Horizontal), 7 (Vectical)
 
 ## Movimientos (Historial)
 - 4: Ataque

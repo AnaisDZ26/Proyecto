@@ -282,6 +282,65 @@ Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List
     return barco;
 }
 
+void *UsarObjeto(int ID, int CoorX, int CoorY, Tablero *TableroRival, int Orientacion){
+    switch (ID)
+    {
+    case 1: { // Bomba
+            printf("INICIO BOMBA: %d,%d\n", CoorX, CoorY);
+            for (int j = CoorY - 1; j <= CoorY + 1; j++) {
+                for (int i = CoorX - 1; i <= CoorX + 1; i++) {
+                    if (i >= 0 && i < TableroRival->ancho && j >= 0 && j < TableroRival->alto) {
+                        int celda_actual = TableroRival->valores[j][i];
+
+                        if (celda_actual > 0) {
+                            TableroRival->valores[j][i] = -2;
+                            printf("IMPACTO BOMBA: %d,%d\n", i, j);
+                        } else if (celda_actual == 0) {
+                            TableroRival->valores[j][i] = -1;
+                            printf("FALLO BOMBA: %d,%d\n", i, j);
+                        }
+                    }
+                }
+            }
+            printf("FIN BOMBA\n");
+            break;
+        }
+        
+        case 2: { // Catalejo
+            printf("INICIO CATALEJO:%d,%d\n", CoorX, CoorY);
+            for (int j = CoorY - 1; j <= CoorY + 1; j++) {
+                for (int i = CoorX - 1; i <= CoorX + 1; i++) {
+                    if (i >= 0 && i < TableroRival->ancho && j >= 0 && j < TableroRival->alto) {
+                        int contenido = TableroRival->valores[j][i];
+                        if (contenido > 0) {
+                            printf("CELDA: %d,%d, BARCO ID: %d\n", i, j, contenido);
+                        } else if (contenido == 0) {
+                            printf("CELDA: %d,%d, AGUA\n", i, j);
+                        } else if (contenido == -1) {
+                            printf("CELDA: %d,%d, FALLO\n", i, j);
+                        } else if (contenido == -2) {
+                            printf("CELDA: %d,%d, GOLPE\n", i, j);
+                        }
+                    }
+                }
+            }
+            printf("FIN CATALEJO\n");
+            break;
+        }
+        
+        case 3: { // Torpedo
+            printf("INICIO TORPEDO: %d,%d,%d\n", CoorX, CoorY, Orientacion);
+            // Codigo del torpedo xd
+            printf("FIN TORPEDO\n");
+            break;
+        }
+        
+        default:
+            printf("ERROR: ID de objeto incorrecta: %d\n", ID);
+            break;
+    }
+}
+
 Partida *leerConfiguracion(const char *archivo)
 {
     FILE *file = fopen(archivo, "r");
@@ -511,13 +570,6 @@ Partida *leerConfiguracion(const char *archivo)
         actual++;
     }
 
-    int *id_ptr = list_first(usuario->objetos);
-    while (id_ptr != NULL) {
-        printf("Objeto Guardado: %d\n", *id_ptr);
-        id_ptr = list_next(usuario->objetos);
-    }
-    printf("\n");
-
     Tablero *tablero_bot = inicializarTableroBot(usuario->tablero->barcos, usuario->tablero->ancho, usuario->tablero->alto);
     if (!tablero_bot)
     {
@@ -621,5 +673,6 @@ int main(int n_args, char *args[])
 
     printf("Error: Acción desconocida '%s'\n", args[1]);
     mostrarAyuda();
+
     return 1;
 }
