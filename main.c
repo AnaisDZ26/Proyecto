@@ -283,6 +283,12 @@ Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List
 }
 
 void *UsarObjeto(int ID, int CoorX, int CoorY, Tablero *TableroRival, int Orientacion){
+
+    if (!TableroRival || !TableroRival->valores) {
+        printf("ERROR: Tablero no encontrado\n");
+        return;
+    }
+
     switch (ID)
     {
     case 1: { // Bomba
