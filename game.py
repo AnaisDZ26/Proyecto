@@ -317,7 +317,83 @@ class MenuScene(Scene):
         action = lambda: self.game.goto_scene("setup")
         self.ui.add_button( "play", (200, 100), action, "Jugar", center=(WIDTH / 2, HEIGHT / 2))
 
+        # Add Historial button
+        action_historial = lambda: self.game.goto_scene("history")
+        self.ui.add_button("historial", (200, 100), action_historial, "Historial", center=(WIDTH / 2, HEIGHT / 2 + 120))
+
     def update(self, screen):
+        self.ui.update(screen)
+
+class HistoryScene(Scene):
+    def setup(self):
+        self.ui = UIManager(self.game)
+        
+        # Add back button
+        action_back = lambda: self.game.goto_scene("menu")
+        self.ui.add_button("back", (120, 40), action_back, "Volver", topleft=(50, 50))
+        
+        # Table data (empty for now)
+        self.table_data = []
+        
+        # Table configuration
+        self.table_width = 800
+        self.table_height = 400
+        self.table_x = (WIDTH - self.table_width) // 2
+        self.table_y = (HEIGHT - self.table_height) // 2
+        
+        # Column headers
+        self.headers = ["ID", "Jugador", "Victoria", "Puntuación"]
+        self.column_widths = [100, 200, 150, 150]  # Width for each column
+        self.row_height = 40
+        self.header_height = 50
+
+    def draw_table(self, screen):
+        # Draw table background
+        table_rect = pg.Rect(self.table_x, self.table_y, self.table_width, self.table_height)
+        pg.draw.rect(screen, (10, 70, 135), table_rect, border_radius=10)
+        
+        # Draw header background
+        header_rect = pg.Rect(self.table_x, self.table_y, self.table_width, self.header_height)
+        pg.draw.rect(screen, (13, 82, 154), header_rect, border_radius=10)
+        
+        # Draw headers
+        font = pg.font.Font(None, 28)
+        x_offset = self.table_x + 20  # Starting x position with padding
+        
+        for i, header in enumerate(self.headers):
+            text = font.render(header, True, (255, 255, 255))
+            text_rect = text.get_rect(midleft=(x_offset, self.table_y + self.header_height // 2))
+            screen.blit(text, text_rect)
+            x_offset += self.column_widths[i]
+        
+        # Draw separator line
+        separator_y = self.table_y + self.header_height
+        pg.draw.line(screen, (255, 255, 255), 
+                    (self.table_x, separator_y), 
+                    (self.table_x + self.table_width, separator_y), 2)
+        
+        # Draw table data (empty for now)
+        if not self.table_data:
+            # Draw "No hay datos" message
+            no_data_font = pg.font.Font(None, 32)
+            no_data_text = no_data_font.render("No hay datos disponibles", True, (255, 255, 255))
+            no_data_rect = no_data_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50))
+            screen.blit(no_data_text, no_data_rect)
+        else:
+            # Draw data rows (when data is available)
+            data_font = pg.font.Font(None, 24)
+            for row_idx, row_data in enumerate(self.table_data):
+                row_y = separator_y + (row_idx + 1) * self.row_height
+                x_offset = self.table_x + 20
+                
+                for col_idx, cell_data in enumerate(row_data):
+                    text = data_font.render(str(cell_data), True, (255, 255, 255))
+                    text_rect = text.get_rect(midleft=(x_offset, row_y + self.row_height // 2))
+                    screen.blit(text, text_rect)
+                    x_offset += self.column_widths[col_idx]
+
+    def update(self, screen):
+        self.draw_table(screen)
         self.ui.update(screen)
 
 class MatchScene(Scene):
@@ -727,7 +803,8 @@ class Game:
         self.scenes = {
             "menu": MenuScene(self),
             "setup": SetupScene(self),
-            "match": MatchScene(self)
+            "match": MatchScene(self),
+            "history": HistoryScene(self)
         }
         self.current_scene = self.scenes["menu"]
         self.current_scene.setup()
