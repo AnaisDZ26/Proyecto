@@ -743,7 +743,6 @@ void leerTurno(Partida *partida, char *eleccion){
 
 }
 
-
 int iniciarJuego(const char *archivo)
 {
     char fullpath[256];
