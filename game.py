@@ -3,6 +3,7 @@ import uuid
 import os
 import shutil
 import subprocess
+import random
 
 WIDTH = 1280
 HEIGHT = 720
@@ -197,7 +198,8 @@ class EnemyGrid(Grid):
 
         if value < 0:
             # play destroy sound
-            pg.mixer.Sound(self.scene.game.assets.audio["music"]["destroy"]).play()
+            destroy_sound = self.scene.game.assets.audio["music"]["destroy"]
+            pg.mixer.Sound(destroy_sound).play()
 
     def draw_cell(self, screen, i, j):
         super().draw_cell(screen, i, j)
@@ -586,7 +588,92 @@ class SetupScene(Scene):
         action = lambda: self.start_match()
         self.ui.add_button( "start", (120, 40), action, "Comenzar", center=(WIDTH - 70, HEIGHT - 30))
 
+        # Add randomize button on top of boat selector panel
+        randomize_action = lambda: self.randomize_boats()
+        self.ui.add_button("randomize", (50, 50), randomize_action, image=self.game.assets.images["dice"], opacity=0.4, center=(70, HEIGHT//2 - HEIGHT//3 - 30))
+
+        # Add clear button next to randomize button
+        clear_action = lambda: self.clear_all_boats()
+        self.ui.add_button("clear", (50, 50), clear_action, image=self.game.assets.images["clear"], opacity=0.4, center=(130, HEIGHT//2 - HEIGHT//3 - 30))
+
         self.game.event_manager.add_action_key(pg.K_r, self.rotate_selected_boat)
+
+    def randomize_boats(self):
+        # Get boats that are not yet placed
+        unplaced_boats = [boat for boat in self.boats if boat['pos'] is None]
+        
+        if not unplaced_boats:
+            # All boats are already placed, just play deny sound
+            pg.mixer.Sound(self.game.assets.audio["music"]["deny"]).play()
+            return
+        
+        # Try to place each unplaced boat randomly
+        for boat in unplaced_boats:
+            attempts = 0
+            max_attempts = 100
+            
+            while attempts < max_attempts:
+                # Random position and direction
+                x = random.randint(0, self.grid.size[0] - 1)
+                y = random.randint(0, self.grid.size[1] - 1)
+                direction = random.choice(['h', 'v'])
+                
+                # Check if boat fits in this position and direction
+                if direction == 'h' and x + boat['size'] <= self.grid.size[0]:
+                    # Check if all cells are empty
+                    can_place = True
+                    for i in range(boat['size']):
+                        if not self.is_cell_empty(x + i, y):
+                            can_place = False
+                            break
+                    
+                    if can_place:
+                        boat['pos'] = (x, y)
+                        boat['direction'] = direction
+                        self.grid.add_boat(boat.copy())
+                        break
+                        
+                elif direction == 'v' and y + boat['size'] <= self.grid.size[1]:
+                    # Check if all cells are empty
+                    can_place = True
+                    for i in range(boat['size']):
+                        if not self.is_cell_empty(x, y + i):
+                            can_place = False
+                            break
+                    
+                    if can_place:
+                        boat['pos'] = (x, y)
+                        boat['direction'] = direction
+                        self.grid.add_boat(boat.copy())
+                        break
+                
+                attempts += 1
+            
+            # If we couldn't place the boat after max attempts, skip it
+            if attempts >= max_attempts:
+                continue
+        
+        # Play sound effect
+        pg.mixer.Sound(self.game.assets.audio["music"]["create"]).play()
+
+    def is_cell_empty(self, x, y):
+        """Check if a cell is empty (no boat occupies it)"""
+        for boat in self.grid.boats:
+            if boat['pos'] is None:
+                continue
+                
+            boat_x, boat_y = boat['pos']
+            boat_size = boat['size']
+            direction = boat.get('direction', 'h')
+            
+            if direction == 'h':
+                if y == boat_y and x >= boat_x and x < boat_x + boat_size:
+                    return False
+            else:  # vertical
+                if x == boat_x and y >= boat_y and y < boat_y + boat_size:
+                    return False
+        
+        return True
 
     def start_match(self):
         self.game.scenes["match"]
@@ -715,6 +802,18 @@ class SetupScene(Scene):
                 
                 pos.y += size + margin
 
+    def clear_all_boats(self):
+        # Clear all boats from the grid
+        self.grid.boats = []
+        
+        # Reset all boats to unplaced state
+        for boat in self.boats:
+            boat['pos'] = None
+            boat['selected'] = False
+        
+        # Play sound effect
+        pg.mixer.Sound(self.game.assets.audio["music"]["destroy"]).play()
+
 class InfoBox:
 
     margin = 10
@@ -792,7 +891,7 @@ class UIManager:
         self.buttons = {}
         self.was_hovering = {}  # Track hover state for each button
 
-    def add_button(self, name, size, click, text=None, topleft=None, center=None):
+    def add_button(self, name, size, click, text=None, image=None, opacity=1.0, topleft=None, center=None):
         rect = pg.Rect(0, 0, size[0], size[1])
         if center is not None:
             rect.center = center
@@ -802,7 +901,9 @@ class UIManager:
         self.buttons[name] = {
             "rect": rect,
             "click": click,
-            "text": text
+            "text": text,
+            "image": image,
+            "opacity": opacity
         }
         self.was_hovering[name] = False
 
@@ -825,16 +926,35 @@ class UIManager:
             
             self.was_hovering[name] = is_hovering
             
-            # Draw button
-            btn_color = (10, 70, 135) if is_hovering else (13, 82, 154)
-            pg.draw.rect(screen, btn_color, btn["rect"], 0, 10)
+            # Create a surface for the button with alpha support
+            btn_surf = pg.Surface((btn["rect"].width, btn["rect"].height), pg.SRCALPHA)
             
-            # Draw text if provided
-            if btn["text"]:
+            # Draw button background with opacity
+            btn_color = (10, 70, 135) if is_hovering else (13, 82, 154)
+            pg.draw.rect(btn_surf, btn_color, (0, 0, btn["rect"].width, btn["rect"].height), 0, 10)
+            
+            # Draw image if provided
+            if btn["image"]:
+                # Scale image to fit button size with some padding
+                img_size = min(btn["rect"].width, btn["rect"].height) - 10
+                scaled_img = pg.transform.smoothscale(btn["image"], (img_size, img_size))
+                
+                # Apply opacity to image
+                if btn["opacity"] < 1.0:
+                    scaled_img.set_alpha(int(255 * btn["opacity"]))
+                
+                img_rect = scaled_img.get_rect(center=(btn["rect"].width//2, btn["rect"].height//2))
+                btn_surf.blit(scaled_img, img_rect)
+            # Draw text if provided (and no image)
+            elif btn["text"]:
                 font = pg.font.Font(None, 24)
-                text = font.render(btn["text"], True, (255, 255, 255))
-                text_rect = text.get_rect(center=btn["rect"].center)
-                screen.blit(text, text_rect)
+                text_color = (255, 255, 255, int(255 * btn["opacity"]))
+                text = font.render(btn["text"], True, text_color)
+                text_rect = text.get_rect(center=(btn["rect"].width//2, btn["rect"].height//2))
+                btn_surf.blit(text, text_rect)
+            
+            # Draw the button surface onto the screen
+            screen.blit(btn_surf, btn["rect"])
 
 
 class Game:
@@ -954,6 +1074,8 @@ class AssetManager:
             "torpedo": pg.image.load("assets/img/torpedo.png").convert_alpha(),
             "target": pg.image.load("assets/img/target.png").convert_alpha(),
             "broken": pg.image.load("assets/img/broken.png").convert_alpha(),
+            "dice": pg.image.load("assets/img/dice.png").convert_alpha(),
+            "clear": pg.image.load("assets/img/clear.png").convert_alpha(),
         }
 
         self.animations = {
