@@ -9,3 +9,5 @@
 ## Movimientos (Historial)
 - 4: Ataque
 - 5: Usar Objeto
+- 8: Nuevo Turno
+- 9: Estado de Casilla 

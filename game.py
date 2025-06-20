@@ -143,6 +143,7 @@ class SetupGrid(Grid):
             self.draw_boat(grid_surf, preview_boat, is_preview=True)
 
 class EnemyGrid(Grid):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -150,6 +151,8 @@ class EnemyGrid(Grid):
         self.target_img = self.scene.game.assets.images["target"]
         target_size = int(self.cell_size * 0.8)
         self.target_img = pg.transform.smoothscale(self.target_img, (target_size, target_size))
+
+        self.state_grid = [[0 for _ in range(self.size[1])] for _ in range(self.size[0])]
 
     def handle_click(self, pos):
         # Convert mouse position to grid cell indices
@@ -163,6 +166,38 @@ class EnemyGrid(Grid):
 
     def clear_target(self):
         self.selected_target = None
+
+    def draw_state(self, screen, x, y):
+
+        screen_middle = pg.Vector2(x, y)
+        grid_middle = pg.Vector2(self.grid_width // 2, self.grid_height // 2)
+        self.start_pos = screen_middle - grid_middle
+
+        grid_surf = pg.Surface((self.grid_width, self.grid_height), pg.SRCALPHA)
+
+        n, m = self.size
+        # Draw cells
+        for i in range(n):
+            for j in range(m):
+                rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
+                
+                if self.state_grid[i][j] == 99:
+                    pg.draw.rect(grid_surf, (10, 70, 135), rect)
+                if self.state_grid[i][j] < 0:
+                    # draw broken image
+                    broken_img = self.scene.game.assets.images["broken"]
+                    broken_img = pg.transform.smoothscale(broken_img, (self.cell_size, self.cell_size))
+                    grid_surf.blit(broken_img, rect)
+
+        screen.blit(grid_surf, self.start_pos)
+
+
+    def update_cell(self, x, y, value):
+        self.state_grid[x][y] = value
+
+        if value < 0:
+            # play destroy sound
+            pg.mixer.Sound(self.scene.game.assets.audio["music"]["destroy"]).play()
 
     def draw_cell(self, screen, i, j):
         super().draw_cell(screen, i, j)
@@ -446,10 +481,12 @@ class MatchScene(Scene):
     def start_backend(self):
 
         if DEV or not os.path.exists("main.exe"):
+            # gcc TDAS/*.c main.c -o main.exe
             subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"])
 
         pipe = subprocess.PIPE
-        self.proc = subprocess.Popen(["./main.exe", "iniciarJuego", f"{self.id}.txt"], stdin=pipe, stdout=pipe, stderr=pipe, text=True)
+        self.proc = subprocess.Popen(["./main.exe", "iniciarJuego", f"{self.id}.txt"], stdin=pipe, stdout=pipe, stderr=pipe, text=True, encoding='utf-8')
+        print(self.proc.stdout.readline(), end='')
 
 
     def init_match(self, grid):
@@ -479,16 +516,34 @@ class MatchScene(Scene):
 
     def end_turn(self):
         if self.gridA.selected_target is not None:
-            # Here you would apply the action (e.g., send to backend, update state, etc.)
-            # print(f"4 {self.gridA.selected_target[0]} {self.gridA.selected_target[1]}")
-            self.proc.stdin.write(f"4 {self.gridA.selected_target[0]} {self.gridA.selected_target[1]}\n")
+            msg = '8 1\n' # Nuevo Turno - 1 mensaje
+            msg += f"4 {self.gridA.selected_target[0]} {self.gridA.selected_target[1]}\n" # Ataque - CoordX, CoordY
+            print(msg, end='')
+            
+            self.proc.stdin.write(msg)
             self.proc.stdin.flush()
 
-            print(self.proc.stdout.readline())
+            # Read the first line (should be "8 1" for number of messages)
+            first_line = self.proc.stdout.readline().strip()
+            
+            # Parse the number of messages
+            if first_line.startswith("8 "):
+                num_messages = int(first_line.split()[1])
+                print(first_line)
+                
+                # Read all the messages
+                for i in range(num_messages):
+                    message = self.proc.stdout.readline().strip()
+                    print(message, end='\n')
+
+                    message_type = int(message.split()[0])
+                    if message_type == 9: # Informe de Estado Casilla
+                        x, y, value = map(int, message.split()[1:])
+                        self.gridA.update_cell(x, y, value)
+                    # Here you can process each message as needed
             
             self.gridA.clear_target()
             self.turn_ended = True
-            # You can add more logic here for turn switching
 
     def draw_fog(self, screen, box):
         fog_surf = pg.Surface(box.size, pg.SRCALPHA)
@@ -505,6 +560,8 @@ class MatchScene(Scene):
 
         gridA_rect = pg.Rect(*self.gridA.start_pos, self.gridA.grid_width, self.gridA.grid_width)
         self.draw_fog(screen, gridA_rect)
+        self.gridA.draw_state(screen, *posA)
+
         # Handle click for targeting
         if self.game.event_manager.is_clicking and not self.turn_ended:
             mouse_pos = pg.mouse.get_pos() - self.gridB.start_pos
@@ -885,7 +942,8 @@ class AssetManager:
                 "main": "assets/audio/menu.mp3",
                 "hover": "assets/audio/hover.wav",
                 "create": "assets/audio/create.wav",
-                "deny": "assets/audio/deny.wav"
+                "deny": "assets/audio/deny.wav",
+                "destroy": "assets/audio/destroy.wav",
             }
         }
 
@@ -894,7 +952,8 @@ class AssetManager:
             "bomb": pg.image.load("assets/img/bomb.png").convert_alpha(),
             "spyglass": pg.image.load("assets/img/spyglass.png").convert_alpha(),
             "torpedo": pg.image.load("assets/img/torpedo.png").convert_alpha(),
-            "target": pg.image.load("assets/img/target.png").convert_alpha()
+            "target": pg.image.load("assets/img/target.png").convert_alpha(),
+            "broken": pg.image.load("assets/img/broken.png").convert_alpha(),
         }
 
         self.animations = {

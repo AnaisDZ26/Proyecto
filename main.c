@@ -34,6 +34,7 @@ typedef struct
 {
     char id[ID_LENGTH + 1]; // +1 para el terminador nulo
     List *jugadores;
+    List *mensajesEstado;
 } Partida;
 
 typedef struct {
@@ -381,6 +382,16 @@ Partida *leerConfiguracion(const char *archivo)
         return NULL;
     }
 
+    // Add this line to initialize mensajesEstado
+    partida->mensajesEstado = list_create();
+    if (!partida->mensajesEstado) {
+        printf("Error: No se pudo crear la lista de mensajes de estado\n");
+        list_clean(partida->jugadores);
+        free(partida);
+        fclose(file);
+        return NULL;
+    }
+
     Jugador *bot = (Jugador *) malloc(sizeof(Jugador));
     if (!bot)
     {
@@ -619,66 +630,117 @@ int mostrarAyuda()
     return 0;
 }
 
-void leerAccion(Partida *partida, char *eleccion){
+void mostrarMensajesEstado(Partida *partida){
+
+    int n_mensajes = list_size(partida->mensajesEstado);
+    printf("8 %d\n", n_mensajes);
+
+    char *mensaje;
+    while ( (mensaje = list_popFront(partida->mensajesEstado)) != NULL)
+        printf("%s\n", mensaje);
+
+    fflush(stdout); 
+}
+
+void leerAtaque(Partida *partida, char *buffer){
+    int codigo;
+    int x, y;
+
+    if (sscanf(buffer, "%d %d %d", &codigo, &x, &y) != 3) {
+        puts("Error: No se ingresaron dos coordenadas correctas");
+        exit(1);
+    }
+
     Jugador *usuario = list_first(partida->jugadores);
     Jugador *bot = list_next(partida->jugadores);
 
-    if (!usuario || !bot || !bot->tablero || !bot->tablero->valores) {
-        printf("Error: No se encontraron jugadores en la partida\n");
-        return;
-    }
+    int ancho = bot->tablero->ancho;
+    int alto = bot->tablero->alto;
 
-    int eleccion_int;
-    if (sscanf(eleccion, "%d", &eleccion_int) != 1) {
-        puts("Error: La elección no es correcta");
-        return;
-    }
+    char *mensaje = malloc(sizeof(char) * 256);
 
-    if (eleccion_int == 4){ // 4 Es para atacar
-        int x, y;
-        printf("Ingrese la coordenada (x, y) del ataque: ");
-        if (sscanf(eleccion, "%d %d %d", &x, &y) != 2){
-            puts("Error: No se ingresaron dos coordenadas correctas");
-            return;
-        }
-        if (x < 0 || x >= bot->tablero->ancho || y < 0 || y >= bot->tablero->alto) {
-            puts("Error: Coordenadas fuera de los límites del tablero");
-            return;
-        }
-        int valor = bot->tablero->valores[y][x];
-        if (valor > 0) {
-            bot->tablero->valores[y][x] = -valor;   // Impacto al barco
-            printf("Ha alcanzado un barco en la posición (%d, %d) ! !\n", x, y);
-        }
-        else if (valor == 0) {
-            bot->tablero->valores[y][x] = 99;   // Impacto al agua
-            printf("Ha fallado el ataque en la posición (%d, %d) ! !\n", x, y);
-        }
+    int valor;
+    if (x >= 0 && x < ancho && y >= 0 && y < alto){
+        valor = bot->tablero->valores[y][x];
+        if (valor > 0) // Impacto a un barco
+            valor = -valor;
+
+        else if (valor == 0)
+            valor = 99; // Impacto al agua
+
         else {
-            puts("Error: Ya ha atacado esta posición");
+            puts("Error: La coordenada ingresada no es válida :()\n");
+            exit(1);
         }
+    } else {
+        puts("Coordenada fuera de rango :(\n");
+        exit(1);
     }
-    else if (eleccion_int == 5){
-        int id_obj, x, y, ori;
-        printf("Ingrese el id del objeto, la coordenada (x, y) y la orientacion (0 para horizontal, 1 para vertical): ");
-        if (scanf("%d %d %d %d", &id_obj, &x, &y, &ori) != 4){
-            puts("Error: No se ingresaron cuatro opciones correctas");
-            puts("Intentelo nuevamente...\n");
-            return;
-        }
-        if (x < 0 || x >= bot->tablero->ancho || y < 0 || y >= bot->tablero->alto) {
-            puts("Error: Coordenadas fuera de los límites del tablero");
-            return;
-        }
-        if (ori < 0 || ori > 1) {
-            puts("Error: Orientación debe ser 0 (horizontal) o 1 (vertical)");
-            return;
-        }
-        usarObjeto(id_obj, x, y, bot->tablero, ori);
+
+    bot->tablero->valores[y][x] = valor;
+
+    sprintf(mensaje, "9 %d %d %d", x, y, valor); // Informe de estado de casilla
+    list_pushBack(partida->mensajesEstado, mensaje);
+}
+
+void leerObjeto(Partida *partida, char *buffer){
+
+    int codigo;
+    int id_objeto, x, y, orientacion;
+
+    if (sscanf(buffer, "%d %d %d %d", &codigo, &id_objeto, &x, &y, &orientacion) != 5) {
+        puts("Error: No se ingresaron cuatro opciones corr  ectas");
+        exit(1);
     }
+
+    Jugador *usuario = list_first(partida->jugadores);
+    Jugador *bot = list_next(partida->jugadores);
+
+    usarObjeto(id_objeto, x, y, bot->tablero, orientacion);
+}
+
+void leerAccion(Partida *partida, char *buffer){
+
+    int tipo_accion;
+
+    if (sscanf(buffer, "%d", &tipo_accion) != 1) {
+        puts("Error: No se ingresó un tipo de acción válido");
+        return;
+    }
+
+    if (tipo_accion == 4)
+        leerAtaque(partida, buffer);
+    
+    else if (tipo_accion == 5)
+        leerObjeto(partida, buffer);
+    
     else {
+        puts("Error: No se ingresó un tipo de acción válido");
         mostrarAyuda();
+        exit(1);
     }
+}
+
+void leerTurno(Partida *partida, char *eleccion){
+
+    int codigo, n_acciones;
+    if (sscanf(eleccion, "%d %d", &codigo, &n_acciones) != 2) {
+        puts("Error: La elección no es correcta");
+        exit(1);
+        return;
+    }
+
+    list_clean(partida->mensajesEstado);
+
+    for (int i = 0; i < n_acciones; i++)
+    {
+        char buffer[256];
+        fgets(buffer, sizeof(buffer), stdin);
+        leerAccion(partida, buffer);
+    }
+
+    mostrarMensajesEstado(partida);
+
 }
 
 
@@ -694,18 +756,13 @@ int iniciarJuego(const char *archivo)
         return 1;
     }
 
-    //Map *Historial = map_create(Historial->is_equal);
-    //Stack *movement = stack_create();                 // CREAR EL MAPA HISTORIAL Y AGREGARLE LA PILA SEGUN LA ID DEL JUGADOR
-    //map_insert(Historial, partida->id, movement); 
-
-    // printf("Partida iniciada con ID: %s\n", partida->id);
-    // verEstadoPartida(partida);
+    printf("PARDTIDA INICIADA ID %s\n", partida->id);
+    fflush(stdout);
 
     char buffer[256];
     while(fgets(buffer, sizeof(buffer), stdin))
     {
-        printf("%s FIN\n", buffer);
-        leerAccion(partida, buffer);
+        leerTurno(partida, buffer);
         fflush(stdout);
     }
 
