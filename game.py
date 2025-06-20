@@ -640,7 +640,7 @@ class MatchScene(Scene):
 
         w_a = self.gridA.grid_width
         gridA_rect = pg.Rect(*self.gridA.start_pos, w_a, w_a)
-        
+
         self.draw_fog(screen, gridA_rect)
         self.gridA.draw_state(screen, *posA)
 
@@ -654,7 +654,9 @@ class MatchScene(Scene):
             mouse_pos = pg.mouse.get_pos() - self.gridB.start_pos
             for i in range(self.gridB.size[0]):
                 for j in range(self.gridB.size[1]):
-                    rect = pg.Rect(i * (self.gridB.cell_size + self.gridB.margin), j * (self.gridB.cell_size + self.gridB.margin), self.gridB.cell_size, self.gridB.cell_size)
+                    w = self.gridB.cell_size + self.gridB.margin
+                    s = self.gridB.cell_size
+                    rect = pg.Rect(i * w, j * w, s, s)
                     if rect.collidepoint(mouse_pos):
                         self.gridB.handle_click(i, j)
 
@@ -675,11 +677,15 @@ class SetupScene(Scene):
 
         # Agregar botón de aleatorización en la parte superior del panel selector de barcos
         randomize_action = lambda: self.randomize_boats()
-        self.ui.add_button("randomize", (50, 50), randomize_action, image=self.game.assets.images["dice"], opacity=0.4, center=(70, HEIGHT//2 - HEIGHT//3 - 30))
+        randomize_center = (70, HEIGHT//2 - HEIGHT//3 - 30)
+        dice_img = self.game.assets.images["dice"]
+        self.ui.add_button("randomize", (50, 50), randomize_action, image=dice_img, opacity=0.4, center=randomize_center)
 
         # Agregar botón de limpiar junto al botón de aleatorización
         clear_action = lambda: self.clear_all_boats()
-        self.ui.add_button("clear", (50, 50), clear_action, image=self.game.assets.images["clear"], opacity=0.4, center=(130, HEIGHT//2 - HEIGHT//3 - 30))
+        clear_center = (130, HEIGHT//2 - HEIGHT//3 - 30)
+        clear_img = self.game.assets.images["clear"]
+        self.ui.add_button("clear", (50, 50), clear_action, image=clear_img, opacity=0.4, center=clear_center)
 
         self.game.event_manager.add_action_key(pg.K_r, self.rotate_selected_boat)
 
