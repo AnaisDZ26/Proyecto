@@ -44,25 +44,25 @@ class Grid:
         short = self.cell_size - padding * 2
         width, height = (long, short) if boat['direction'] == 'h' else (short, long)
 
-        # Create the boat rectangle with padding
+        # Crear el rectángulo del barco con padding
         boat_rect = pg.Rect(x, y, width, height)
         
-        # Create a surface for the boat with alpha channel
+        # Crear una superficie para el barco con canal alfa
         boat_surf = pg.Surface((boat_rect.width, boat_rect.height), pg.SRCALPHA)
         boat_color = (151, 87, 43, 128 if is_preview else 255)
         pg.draw.rect(boat_surf, boat_color, pg.Rect(0, 0, boat_rect.width, boat_rect.height), border_radius=5)
         
-        # Draw the boat surface onto the screen
+        # Dibujar la superficie del barco en la pantalla
         screen.blit(boat_surf, boat_rect)
     
     def draw_cell(self, screen, i, j):
         rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
 
-        # Check if mouse is hovering over this cell
+        # Verificar si el mouse está sobre esta celda
         mouse_pos = pg.mouse.get_pos() - self.start_pos
         color = self.hover_color if rect.collidepoint(mouse_pos) else self.cell_color
         
-        # Draw cell
+        # Dibujar celda
         pg.draw.rect(screen, color, rect, border_radius=5)
 
         return rect
@@ -81,12 +81,12 @@ class Grid:
         grid_surf = pg.Surface((self.grid_width, self.grid_height), pg.SRCALPHA)
 
         n, m = self.size
-        # Draw cells
+        # Dibujar celdas
         for i in range(n):
             for j in range(m):
                 self.draw_cell(grid_surf, i, j)
 
-        # Draw boats after the grid
+        # Dibujar barcos después de la cuadrícula
         for boat in self.boats:
             if boat['pos'] is not None:
                 self.draw_boat(grid_surf, boat)
@@ -108,37 +108,40 @@ class SetupGrid(Grid):
     def preview(self, boat):
         self.preview_boat = boat
         if 'direction' not in self.preview_boat:
-            self.preview_boat['direction'] = 'h'  # Default to horizontal if not set
+            self.preview_boat['direction'] = 'h'  # Por defecto horizontal si no está establecido
 
     def draw_cell(self, screen, i, j):
         rect = super().draw_cell(screen, i, j)
 
         mouse_pos = pg.mouse.get_pos() - self.start_pos
-        rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
+        w = self.cell_size + self.margin
+        s = self.cell_size
+        rect = pg.Rect(i * w, j * w, s, s)
+
         if self.preview_boat and rect.collidepoint(mouse_pos):
-            # Check if boat would exceed grid boundaries
+            # Verificar si el barco excedería los límites de la cuadrícula
             boat_size = self.preview_boat['size']
             direction = self.preview_boat.get('direction', 'h')
             
-            # Check if boat fits in current direction, if not try the other direction
+            # Verificar si el barco cabe en la dirección actual, si no, probar la otra dirección
             if direction == 'h' and i + boat_size > self.size[0]:
                 direction = 'v'
             elif direction == 'v' and j + boat_size > self.size[1]:
                 direction = 'h'
             self.preview_boat['direction'] = direction
                 
-            # Set preview position if boat fits in either direction
+            # Establecer posición de vista previa si el barco cabe en cualquier dirección
             if (direction == 'h' and i + boat_size <= self.size[0]) or \
                (direction == 'v' and j + boat_size <= self.size[1]):
                 self.preview_boat['direction'] = direction
                 self.preview_pos = (i, j)
 
     def draw(self, grid_surf):
-         # Draw preview boat if we have a position
+         # Dibujar barco de vista previa si tenemos una posición
         if self.preview_boat and self.preview_pos:
             preview_boat = self.preview_boat.copy()
             preview_boat['pos'] = self.preview_pos
-            # Ensure direction is set
+            # Asegurar que la dirección esté establecida
             if 'direction' not in preview_boat:
                 preview_boat['direction'] = 'h'
             self.draw_boat(grid_surf, preview_boat, is_preview=True)
@@ -151,16 +154,19 @@ class EnemyGrid(Grid):
         self.selected_target = None
         self.target_img = self.scene.game.assets.images["target"]
         target_size = int(self.cell_size * 0.8)
-        self.target_img = pg.transform.smoothscale(self.target_img, (target_size, target_size))
+        dim = (target_size, target_size)
+        self.target_img = pg.transform.smoothscale(self.target_img, dim)
 
         self.state_grid = [[0 for _ in range(self.size[1])] for _ in range(self.size[0])]
 
     def handle_click(self, pos):
-        # Convert mouse position to grid cell indices
+        # Convertir posición del mouse a índices de celda de la cuadrícula
         mouse_vec = pg.Vector2(pos) - self.start_pos
         for i in range(self.size[0]):
             for j in range(self.size[1]):
-                rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
+                w = self.cell_size + self.margin
+                s = self.cell_size
+                rect = pg.Rect(i * w, j * w, s, s)
                 if rect.collidepoint(mouse_vec):
                     self.selected_target = (i, j)
                     return
@@ -177,17 +183,20 @@ class EnemyGrid(Grid):
         grid_surf = pg.Surface((self.grid_width, self.grid_height), pg.SRCALPHA)
 
         n, m = self.size
-        # Draw cells
+        # Dibujar celdas
         for i in range(n):
             for j in range(m):
-                rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
+                w = self.cell_size + self.margin
+                s = self.cell_size
+                rect = pg.Rect(i * w, j * w, s, s)
                 
                 if self.state_grid[i][j] == 99:
                     pg.draw.rect(grid_surf, (10, 70, 135), rect)
+
                 if self.state_grid[i][j] < 0:
-                    # draw broken image
+                    # dibujar imagen de roto
                     broken_img = self.scene.game.assets.images["broken"]
-                    broken_img = pg.transform.smoothscale(broken_img, (self.cell_size, self.cell_size))
+                    broken_img = pg.transform.smoothscale(broken_img, (s, s))
                     grid_surf.blit(broken_img, rect)
 
         screen.blit(grid_surf, self.start_pos)
@@ -197,21 +206,24 @@ class EnemyGrid(Grid):
         self.state_grid[x][y] = value
 
         if value < 0:
-            # play destroy sound
+            # reproducir sonido de destrucción
             destroy_sound = self.scene.game.assets.audio["music"]["destroy"]
             pg.mixer.Sound(destroy_sound).play()
 
     def draw_cell(self, screen, i, j):
         super().draw_cell(screen, i, j)
         if self.selected_target == (i, j):
-            rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
-            # Center the target image in the cell
+            w = self.cell_size + self.margin
+            s = self.cell_size
+            rect = pg.Rect(i * w, j * w, s, s)
+
+            # Centrar la imagen del objetivo en la celda
             img_rect = self.target_img.get_rect(center=rect.center)
             screen.blit(self.target_img, img_rect)    
 
 class ObjectPanel:
 
-    img_size = (50, 50)
+    img_size = (55, 55)
 
     def __init__(self, game, width, height):
         self.game = game
@@ -224,24 +236,84 @@ class ObjectPanel:
             'spyglass': {'id': 2, 'quantity': 1, 'image': assets.images["spyglass"], 'info': "Catalejo\nPuede ver casillas en un rango de 3x3"},
             'torpedo': {'id': 3, 'quantity': 1, 'image': assets.images["torpedo"], 'info': "Torpedo\nEs lanzado en línea recta desde el borde para destruir la primera casilla que encuentre"}
         }
-        self.selector_rects = {}  # Store selector rectangles for click detection
         self.setup()
 
+    def set_items(self, items):
+        self.items = items
+
     def setup(self):
-        # Load images
+        # Cargar imágenes
         for item in self.items.values():
             item['surface'] = pg.transform.scale(item['image'], self.img_size)
+
+    def handle_click(self, pos):
+        # Método base para manejar clics - puede ser sobrescrito por subclases
+        pass
+
+    def update(self, screen, x, y):
+        self.panel_x = x
+        self.panel_y = y
+        
+        # Dibujar fondo del panel
+        surf = pg.Surface((self.width, self.height), pg.SRCALPHA)
+        pg.draw.rect(surf, (10, 70, 135), (0, 0, self.width, self.height), border_radius=5)
+        
+        # Calcular diseño de cuadrícula
+        cell_width = self.width // 3
+        cell_height = 90
+        padding = 10
+        
+        # Dibujar elementos en cuadrícula
+        for i, (item_name, item) in enumerate(self.items.items()):
+            col = i % 3
+            row = i // 3
+            
+            # Calcular posición de la caja
+            box_rect = pg.Rect(
+                col * cell_width + padding,
+                row * cell_height + padding,
+                cell_width - padding * 2,
+                cell_height - padding * 2
+            )
+            pg.draw.rect(surf, (13, 82, 154), box_rect, border_radius=8)
+            
+            # Calcular posición centrada de la imagen
+            item_x = box_rect.centerx - self.img_size[0] // 2
+            item_y = box_rect.centery - self.img_size[1] // 2
+            
+            # Dibujar imagen del elemento
+            surf.blit(item['surface'], (item_x, item_y))
+
+            # Dibujar cantidad de usos restantes
+            if item['quantity'] > 0:
+                font = pg.font.Font(None, 20)
+                quantity_text = font.render(str(item['quantity']), True, (255, 255, 255))
+                # Posicionar en la esquina superior derecha de la caja
+                text_x = box_rect.right - quantity_text.get_width() - 5
+                text_y = box_rect.top + 5
+                surf.blit(quantity_text, (text_x, text_y))
+
+            mouse_relative_pos = pg.Vector2(pg.mouse.get_pos()) - pg.Vector2(x, y)
+            if box_rect.collidepoint(mouse_relative_pos):
+                self.game.info_box.add_message(f"{item['info']}")
+        
+        screen.blit(surf, (x, y))
+
+class SetupObjectPanel(ObjectPanel):
+    def __init__(self, game, width, height):
+        super().__init__(game, width, height)
+        self.selector_rects = {}  # Almacenar rectángulos del selector para detección de clics
 
     def draw_quantity_selector(self, screen, pos, size, quantity, item_name):
 
         x, y = pos
         w, h = size
 
-        # Draw quantity background
+        # Dibujar fondo del selector de cantidad
         selector_rect = pg.Rect(x, y, w, h)
         pg.draw.rect(screen, (10, 100, 180), selector_rect)
         
-        # Draw minus button
+        # Dibujar botón menos
         minus_rect = pg.Rect(x, y, w // 3, h)
         pg.draw.rect(screen, (7, 41, 77), minus_rect)
         font = pg.font.Font(None, 20)
@@ -250,31 +322,31 @@ class ObjectPanel:
         minus_text_rect = minus_text.get_rect(center=minus_rect.center)
         screen.blit(minus_text, minus_text_rect)
         
-        # Draw quantity
+        # Dibujar cantidad
         quantity_text = font.render(str(quantity), True, (255, 255, 255))
         q_rect = quantity_text.get_rect(center=selector_rect.center)
         screen.blit(quantity_text, q_rect)
         
-        # Draw plus button
+        # Dibujar botón más
         plus_rect = pg.Rect(x + w - w // 3, y, w // 3, h)
         pg.draw.rect(screen, (7, 41, 77), plus_rect)
         plus_text = font.render("+", True, (255, 255, 255))
         plus_text_rect = plus_text.get_rect(center=plus_rect.center)
         screen.blit(plus_text, plus_text_rect)
         
-        # Store rectangles for click detection
+        # Almacenar rectángulos para detección de clics con coordenadas relativas al panel
         self.selector_rects[item_name] = {
-            'minus': minus_rect,
-            'plus': plus_rect
+            'minus': pg.Rect(x, y, w // 3, h),
+            'plus': pg.Rect(x + w - w // 3, y, w // 3, h)
         }
 
     def handle_click(self, pos):
-        # Convert global position to local panel position
+        # Convertir posición global a posición local del panel
         local_pos = (pos[0] - self.panel_x, pos[1] - self.panel_y)
         audio = self.game.assets.audio["music"]
         mixer = pg.mixer
 
-        # Check each item's selector buttons
+        # Verificar cada botón del selector de cada elemento
         for item_name, rects in self.selector_rects.items():
             if rects['minus'].collidepoint(local_pos):
                 if self.items[item_name]['quantity'] > 0:
@@ -290,21 +362,21 @@ class ObjectPanel:
         self.panel_x = x
         self.panel_y = y
         
-        # Draw panel background
+        # Dibujar fondo del panel
         surf = pg.Surface((self.width, self.height), pg.SRCALPHA)
         pg.draw.rect(surf, (10, 70, 135), (0, 0, self.width, self.height), border_radius=5)
         
-        # Calculate grid layout
+        # Calcular diseño de cuadrícula
         cell_width = self.width // 3
         cell_height = 90
         padding = 10
         
-        # Draw items in grid
+        # Dibujar elementos en cuadrícula
         for i, (item_name, item) in enumerate(self.items.items()):
             col = i % 3
             row = i // 3
             
-            # Calculate box position
+            # Calcular posición de la caja
             box_rect = pg.Rect(
                 col * cell_width + padding,
                 row * cell_height + padding,
@@ -313,18 +385,18 @@ class ObjectPanel:
             )
             pg.draw.rect(surf, (13, 82, 154), box_rect, border_radius=8)
             
-            # Calculate centered image position
+            # Calcular posición centrada de la imagen
             item_x = box_rect.centerx - self.img_size[0] // 2
-            item_y = box_rect.centery - self.img_size[1] // 2 - 10  # Offset up slightly to make room for selector
+            item_y = box_rect.centery - self.img_size[1] // 2 - 10  # Desplazamiento hacia arriba para hacer espacio al selector
             
-            # Draw item image
+            # Dibujar imagen del elemento
             surf.blit(item['surface'], (item_x, item_y))
 
             mouse_relative_pos = pg.Vector2(pg.mouse.get_pos()) - pg.Vector2(x, y)
             if box_rect.collidepoint(mouse_relative_pos):
                 self.game.info_box.add_message(f"{item['info']}")
             
-            # Draw quantity selector
+            # Dibujar selector de cantidad
             h = 20
             selector_size = (box_rect.width, h)
             selector_pos = (box_rect.left, item_y + box_rect.height - h)
@@ -352,11 +424,13 @@ class MenuScene(Scene):
         self.ui = UIManager(self.game)
 
         action = lambda: self.game.goto_scene("setup")
-        self.ui.add_button( "play", (200, 100), action, "Jugar", center=(WIDTH / 2, HEIGHT / 2))
+        play_center = (WIDTH / 2, HEIGHT / 2)
+        self.ui.add_button( "play", (200, 100), action, "Jugar", center=play_center)
 
-        # Add Historial button
+        # Agregar botón de Historial
         action_historial = lambda: self.game.goto_scene("history")
-        self.ui.add_button("historial", (200, 100), action_historial, "Historial", center=(WIDTH / 2, HEIGHT / 2 + 120))
+        history_center = (WIDTH / 2, HEIGHT / 2 + 120)
+        self.ui.add_button("historial", (200, 100), action_historial, "Historial", center=history_center)
 
     def update(self, screen):
         self.ui.update(screen)
@@ -365,37 +439,37 @@ class HistoryScene(Scene):
     def setup(self):
         self.ui = UIManager(self.game)
         
-        # Add back button
+        # Agregar botón de regreso
         action_back = lambda: self.game.goto_scene("menu")
         self.ui.add_button("back", (120, 40), action_back, "Volver", topleft=(50, 50))
         
-        # Table data (empty for now)
+        # Datos de la tabla (vacíos por ahora)
         self.table_data = []
         
-        # Table configuration
+        # Configuración de la tabla
         self.table_width = 800
         self.table_height = 400
         self.table_x = (WIDTH - self.table_width) // 2
         self.table_y = (HEIGHT - self.table_height) // 2
         
-        # Column headers
+        # Encabezados de columnas
         self.headers = ["ID", "Jugador", "Victoria", "Puntuación"]
-        self.column_widths = [100, 200, 150, 150]  # Width for each column
+        self.column_widths = [100, 200, 150, 150]  # Ancho para cada columna
         self.row_height = 40
         self.header_height = 50
 
     def draw_table(self, screen):
-        # Draw table background
+        # Dibujar fondo de la tabla
         table_rect = pg.Rect(self.table_x, self.table_y, self.table_width, self.table_height)
         pg.draw.rect(screen, (10, 70, 135), table_rect, border_radius=10)
         
-        # Draw header background
+        # Dibujar fondo del encabezado
         header_rect = pg.Rect(self.table_x, self.table_y, self.table_width, self.header_height)
         pg.draw.rect(screen, (13, 82, 154), header_rect, border_radius=10)
         
-        # Draw headers
+        # Dibujar encabezados
         font = pg.font.Font(None, 28)
-        x_offset = self.table_x + 20  # Starting x position with padding
+        x_offset = self.table_x + 20  # Posición x inicial con padding
         
         for i, header in enumerate(self.headers):
             text = font.render(header, True, (255, 255, 255))
@@ -403,21 +477,21 @@ class HistoryScene(Scene):
             screen.blit(text, text_rect)
             x_offset += self.column_widths[i]
         
-        # Draw separator line
+        # Dibujar línea separadora
         separator_y = self.table_y + self.header_height
         pg.draw.line(screen, (255, 255, 255), 
                     (self.table_x, separator_y), 
                     (self.table_x + self.table_width, separator_y), 2)
         
-        # Draw table data (empty for now)
+        # Dibujar datos de la tabla (vacíos por ahora)
         if not self.table_data:
-            # Draw "No hay datos" message
+            # Dibujar mensaje "No hay datos"
             no_data_font = pg.font.Font(None, 32)
             no_data_text = no_data_font.render("No hay datos disponibles", True, (255, 255, 255))
             no_data_rect = no_data_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50))
             screen.blit(no_data_text, no_data_rect)
         else:
-            # Draw data rows (when data is available)
+            # Dibujar filas de datos (cuando hay datos disponibles)
             data_font = pg.font.Font(None, 24)
             for row_idx, row_data in enumerate(self.table_data):
                 row_y = separator_y + (row_idx + 1) * self.row_height
@@ -434,8 +508,8 @@ class HistoryScene(Scene):
         self.ui.update(screen)
 
 class MatchScene(Scene):
-    def setup(self, grid):
-        self.init_match(grid)
+    def setup(self, grid, objects):
+        self.init_match(grid, objects)
 
     def handle_click(self, pos):
         self.gridA.handle_click(pos)
@@ -444,39 +518,39 @@ class MatchScene(Scene):
 
         grid = self.gridB
 
-        # Clean cache directory
+        # Limpiar directorio de caché
         if os.path.exists("cache"):
             shutil.rmtree("cache")
         os.makedirs("cache")
 
         with open(f"cache/{self.id}.txt", "w") as f:
-            # Write match ID
+            # Escribir ID de partida
             f.write(f"{self.id}\n")
             
-            # Write grid size
+            # Escribir tamaño de cuadrícula
             f.write(f"{grid.size[0]} {grid.size[1]}\n")
             
-            # Create and write the grid state
+            # Crear y escribir el estado de la cuadrícula
             grid_state = [[0 for _ in range(grid.size[1])] for _ in range(grid.size[0])]
             
-            # Fill in boat positions
+            # Llenar posiciones de barcos
             for boat in grid.boats:
                 x, y = boat['pos']
                 for i in range(boat['size']):
-                    if boat.get('direction', 'h') == 'h':  # Default to horizontal if not set
+                    if boat.get('direction', 'h') == 'h':  # Por defecto horizontal si no está establecido
                         grid_state[y][x+i] = boat['id']
                     else:  # vertical
                         grid_state[y+i][x] = boat['id']
             
-            # Write the grid state
+            # Escribir el estado de la cuadrícula
             for row in grid_state:
                 f.write(" ".join(map(str, row)) + "\n")
 
-            # Write objects information
+            # Escribir información de objetos
             objects_with_quantity = [item for item in self.game.scenes["setup"].object_panel.items.values() if item['quantity'] > 0]
             f.write(f"N objetos: {len(objects_with_quantity)}\n")
             
-            # Write each object's id and quantity
+            # Escribir id y cantidad de cada objeto
             for item in objects_with_quantity:
                 f.write(f"{item['id']} {item['quantity']}\n")
 
@@ -491,11 +565,15 @@ class MatchScene(Scene):
         print(self.proc.stdout.readline(), end='')
 
 
-    def init_match(self, grid):
+    def init_match(self, grid, objects):
 
         margin = WIDTH // 20
         self.gridA = EnemyGrid(self, GRID_SIZE, WIDTH // 2 - margin*2, HEIGHT * 0.9, boats=[])
         self.gridB = Grid(self, GRID_SIZE, HEIGHT // 2 - margin*2, HEIGHT * 0.8, boats=grid.boats)
+
+        # Agregar panel de objetos para uso en juego
+        self.object_panel = ObjectPanel(self.game, WIDTH // 4, HEIGHT // 6)
+        self.object_panel.set_items(objects)
 
         self.fog_list = []
         x_step = self.gridA.grid_width // 5
@@ -510,7 +588,7 @@ class MatchScene(Scene):
         self.id = str(uuid.uuid4())[:5]
         self.save_config()
         self.start_backend()
-        # Add 'Terminar Turno' button
+        # Agregar botón 'Terminar Turno'
         self.ui = UIManager(self.game)
         action = self.end_turn
         self.ui.add_button("end_turn", (180, 50), action, "Terminar Turno", topleft=(WIDTH-200, HEIGHT-70))
@@ -525,15 +603,15 @@ class MatchScene(Scene):
             self.proc.stdin.write(msg)
             self.proc.stdin.flush()
 
-            # Read the first line (should be "8 1" for number of messages)
+            # Leer la primera línea (debería ser "8 1" para número de mensajes)
             first_line = self.proc.stdout.readline().strip()
             
-            # Parse the number of messages
+            # Analizar el número de mensajes
             if first_line.startswith("8 "):
                 num_messages = int(first_line.split()[1])
                 print(first_line)
                 
-                # Read all the messages
+                # Leer todos los mensajes
                 for i in range(num_messages):
                     message = self.proc.stdout.readline().strip()
                     print(message, end='\n')
@@ -542,7 +620,7 @@ class MatchScene(Scene):
                     if message_type == 9: # Informe de Estado Casilla
                         x, y, value = map(int, message.split()[1:])
                         self.gridA.update_cell(x, y, value)
-                    # Here you can process each message as needed
+                    # Aquí puedes procesar cada mensaje según sea necesario
             
             self.gridA.clear_target()
             self.turn_ended = True
@@ -553,18 +631,25 @@ class MatchScene(Scene):
         screen.blit(fog_surf, box.topleft)
 
     def update(self, screen):
-        # Draw the grid
+        # Dibujar la cuadrícula
         posA = pg.Vector2(2 * WIDTH / 3, HEIGHT / 2)
         posB = pg.Vector2(WIDTH / 4, HEIGHT / 3)
 
         self.gridA.update(screen, *posA)
         self.gridB.update(screen, *posB)
 
-        gridA_rect = pg.Rect(*self.gridA.start_pos, self.gridA.grid_width, self.gridA.grid_width)
+        w_a = self.gridA.grid_width
+        gridA_rect = pg.Rect(*self.gridA.start_pos, w_a, w_a)
+        
         self.draw_fog(screen, gridA_rect)
         self.gridA.draw_state(screen, *posA)
 
-        # Handle click for targeting
+        # Dibujar panel de objetos debajo de gridB
+        panel_x = WIDTH // 4 - self.object_panel.width // 2
+        panel_y = HEIGHT // 3 + self.gridB.grid_height // 2 + 20
+        self.object_panel.update(screen, panel_x, panel_y)
+
+        # Manejar clic para apuntar
         if self.game.event_manager.is_clicking and not self.turn_ended:
             mouse_pos = pg.mouse.get_pos() - self.gridB.start_pos
             for i in range(self.gridB.size[0]):
@@ -578,7 +663,7 @@ class MatchScene(Scene):
 class SetupScene(Scene):
     def setup(self):
         self.grid = SetupGrid(self, GRID_SIZE, WIDTH, HEIGHT * 0.8)
-        self.object_panel = ObjectPanel(self.game, WIDTH // 5, HEIGHT * 0.8)
+        self.object_panel = SetupObjectPanel(self.game, WIDTH // 5, HEIGHT * 0.8)
 
         new_boat = lambda size: {'size': size, 'pos': None, 'direction': 'h', 'selected': False }
         self.boats = [ new_boat(2), new_boat(3), new_boat(3), new_boat(4), new_boat(5) ]
@@ -588,39 +673,39 @@ class SetupScene(Scene):
         action = lambda: self.start_match()
         self.ui.add_button( "start", (120, 40), action, "Comenzar", center=(WIDTH - 70, HEIGHT - 30))
 
-        # Add randomize button on top of boat selector panel
+        # Agregar botón de aleatorización en la parte superior del panel selector de barcos
         randomize_action = lambda: self.randomize_boats()
         self.ui.add_button("randomize", (50, 50), randomize_action, image=self.game.assets.images["dice"], opacity=0.4, center=(70, HEIGHT//2 - HEIGHT//3 - 30))
 
-        # Add clear button next to randomize button
+        # Agregar botón de limpiar junto al botón de aleatorización
         clear_action = lambda: self.clear_all_boats()
         self.ui.add_button("clear", (50, 50), clear_action, image=self.game.assets.images["clear"], opacity=0.4, center=(130, HEIGHT//2 - HEIGHT//3 - 30))
 
         self.game.event_manager.add_action_key(pg.K_r, self.rotate_selected_boat)
 
     def randomize_boats(self):
-        # Get boats that are not yet placed
+        # Obtener barcos que aún no han sido colocados
         unplaced_boats = [boat for boat in self.boats if boat['pos'] is None]
         
         if not unplaced_boats:
-            # All boats are already placed, just play deny sound
+            # Todos los barcos ya están colocados, solo reproducir sonido de denegación
             pg.mixer.Sound(self.game.assets.audio["music"]["deny"]).play()
             return
         
-        # Try to place each unplaced boat randomly
+        # Intentar colocar cada barco no colocado aleatoriamente
         for boat in unplaced_boats:
             attempts = 0
             max_attempts = 100
             
             while attempts < max_attempts:
-                # Random position and direction
+                # Posición y dirección aleatorias
                 x = random.randint(0, self.grid.size[0] - 1)
                 y = random.randint(0, self.grid.size[1] - 1)
                 direction = random.choice(['h', 'v'])
                 
-                # Check if boat fits in this position and direction
+                # Verificar si el barco cabe en esta posición y dirección
                 if direction == 'h' and x + boat['size'] <= self.grid.size[0]:
-                    # Check if all cells are empty
+                    # Verificar si todas las celdas están vacías
                     can_place = True
                     for i in range(boat['size']):
                         if not self.is_cell_empty(x + i, y):
@@ -634,7 +719,7 @@ class SetupScene(Scene):
                         break
                         
                 elif direction == 'v' and y + boat['size'] <= self.grid.size[1]:
-                    # Check if all cells are empty
+                    # Verificar si todas las celdas están vacías
                     can_place = True
                     for i in range(boat['size']):
                         if not self.is_cell_empty(x, y + i):
@@ -649,15 +734,15 @@ class SetupScene(Scene):
                 
                 attempts += 1
             
-            # If we couldn't place the boat after max attempts, skip it
+            # Si no pudimos colocar el barco después del máximo de intentos, saltarlo
             if attempts >= max_attempts:
                 continue
         
-        # Play sound effect
+        # Reproducir efecto de sonido
         pg.mixer.Sound(self.game.assets.audio["music"]["create"]).play()
 
     def is_cell_empty(self, x, y):
-        """Check if a cell is empty (no boat occupies it)"""
+        """Verificar si una celda está vacía (ningún barco la ocupa)"""
         for boat in self.grid.boats:
             if boat['pos'] is None:
                 continue
@@ -675,12 +760,25 @@ class SetupScene(Scene):
         
         return True
 
+    def clear_all_boats(self):
+        # Limpiar todos los barcos de la cuadrícula
+        self.grid.boats = []
+        
+        # Restablecer todos los barcos al estado no colocado
+        for boat in self.boats:
+            boat['pos'] = None
+            boat['selected'] = False
+        
+        # Reproducir efecto de sonido
+        destroy_sound = self.game.assets.audio["music"]["destroy"]
+        pg.mixer.Sound(destroy_sound).play()
+
     def start_match(self):
         self.game.scenes["match"]
-        self.game.goto_scene("match", grid=self.grid)
+        self.game.goto_scene("match", grid=self.grid, objects=self.object_panel.items)
 
     def place_boat(self, pos):
-        # Find the selected boat
+        # Encontrar el barco seleccionado
         selected_boat = None
         for boat in self.boats:
             if boat['selected']:
@@ -690,21 +788,22 @@ class SetupScene(Scene):
         if not selected_boat:
             return
             
-        # Check if the boat can be placed at this position
+        # Verificar si el barco puede ser colocado en esta posición
         if not self.grid.preview_pos:
             return
         
-        pg.mixer.Sound(self.game.assets.audio["music"]["create"]).play()
+        create_sound = self.game.assets.audio["music"]["create"]
+        pg.mixer.Sound(create_sound).play()
             
-        # Place the boat
+        # Colocar el barco
         selected_boat['pos'] = self.grid.preview_pos
-        selected_boat['direction'] = selected_boat.get('direction', 'h')  # Ensure direction is set
+        selected_boat['direction'] = selected_boat.get('direction', 'h')  # Asegurar que la dirección esté establecida
         selected_boat['selected'] = False
         
-        # Add the boat to the grid
+        # Agregar el barco a la cuadrícula
         self.grid.add_boat(selected_boat.copy())
         
-        # Remove the boat from the available boats
+        # Remover el barco de los barcos disponibles
         self.boats.remove(selected_boat)
 
     def rotate_selected_boat(self):
@@ -733,7 +832,7 @@ class SetupScene(Scene):
         return pg.transform.rotate(surf, 45)
 
     def handle_click(self, pos):
-        # Check if click is on object panel
+        # Verificar si el clic está en el panel de objetos
         panel_x = WIDTH - self.object_panel.width - 50
         panel_y = HEIGHT // 2 - self.object_panel.height // 2
         panel_rect = pg.Rect(panel_x, panel_y, self.object_panel.width, self.object_panel.height)
@@ -742,7 +841,7 @@ class SetupScene(Scene):
             self.object_panel.handle_click(pos)
             return True
             
-        # Handle boat placement on click
+        # Manejar colocación de barco en clic
         if self.grid.preview_pos:
             self.place_boat(self.grid.preview_pos)
             return True
@@ -754,10 +853,6 @@ class SetupScene(Scene):
         rect = pg.Rect(0, 0, 80, 2*HEIGHT//3)
         rect.center = (100, HEIGHT / 2)
         pg.draw.rect(screen, (12, 139, 221), rect, border_radius=5)
-
-        # Handle boat placement on click
-        if self.game.event_manager.is_clicking:
-            self.handle_click(pg.mouse.get_pos())
 
         self.ui.update(screen)
         self.object_panel.update(screen, WIDTH - self.object_panel.width - 50, HEIGHT // 2 - self.object_panel.height // 2)
@@ -801,18 +896,6 @@ class SetupScene(Scene):
                 screen.blit(surf, (pos.x - offset_x, pos.y - offset_y))
                 
                 pos.y += size + margin
-
-    def clear_all_boats(self):
-        # Clear all boats from the grid
-        self.grid.boats = []
-        
-        # Reset all boats to unplaced state
-        for boat in self.boats:
-            boat['pos'] = None
-            boat['selected'] = False
-        
-        # Play sound effect
-        pg.mixer.Sound(self.game.assets.audio["music"]["destroy"]).play()
 
 class InfoBox:
 
