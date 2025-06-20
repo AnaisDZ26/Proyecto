@@ -158,6 +158,12 @@ class EnemyGrid(Grid):
         self.target_img = pg.transform.smoothscale(self.target_img, dim)
 
         self.state_grid = [[0 for _ in range(self.size[1])] for _ in range(self.size[0])]
+        
+        # Referencia al objeto seleccionado para mostrar marcador
+        self.selected_object = None
+
+    def set_selected_object(self, object_name):
+        self.selected_object = object_name
 
     def handle_click(self, pos):
         # Convertir posición del mouse a índices de celda de la cuadrícula
@@ -199,27 +205,71 @@ class EnemyGrid(Grid):
                     broken_img = pg.transform.smoothscale(broken_img, (s, s))
                     grid_surf.blit(broken_img, rect)
 
+        # Dibujar objetos colocados
+        self.draw_placed_objects(grid_surf)
+
         screen.blit(grid_surf, self.start_pos)
 
+    def draw_placed_objects(self, grid_surf):
+        """Dibujar objetos que han sido colocados en la cuadrícula"""
+        if not hasattr(self.scene, 'placed_objects'):
+            return
+            
+        for obj in self.scene.placed_objects:
+            x, y = obj['x'], obj['y']
+            object_name = obj['object_name']
+            
+            # Calcular posición en la superficie de la cuadrícula
+            w = self.cell_size + self.margin
+            s = self.cell_size
+            rect = pg.Rect(x * w, y * w, s, s)
+            
+            # Obtener imagen del objeto
+            obj_img = self.scene.game.assets.images[object_name]
+            obj_size = int(self.cell_size * 0.6)
+            scaled_obj = pg.transform.smoothscale(obj_img, (obj_size, obj_size))
+            
+            # Centrar la imagen del objeto en la celda
+            obj_rect = scaled_obj.get_rect(center=rect.center)
+            grid_surf.blit(scaled_obj, obj_rect)
 
     def update_cell(self, x, y, value):
         self.state_grid[x][y] = value
 
         if value < 0:
             # reproducir sonido de destrucción
-            destroy_sound = self.scene.game.assets.audio["music"]["destroy"]
-            pg.mixer.Sound(destroy_sound).play()
+            destroy_sound = self.scene.game.assets.audio["sfx"]["destroy"]
+            destroy_sound.play()
 
     def draw_cell(self, screen, i, j):
         super().draw_cell(screen, i, j)
+        
+        # Dibujar marcador de objetivo seleccionado
         if self.selected_target == (i, j):
             w = self.cell_size + self.margin
             s = self.cell_size
             rect = pg.Rect(i * w, j * w, s, s)
-
             # Centrar la imagen del objetivo en la celda
             img_rect = self.target_img.get_rect(center=rect.center)
-            screen.blit(self.target_img, img_rect)    
+            screen.blit(self.target_img, img_rect)
+        
+        # Dibujar marcador de objeto seleccionado solo en la posición del mouse
+        if self.selected_object:
+            w = self.cell_size + self.margin
+            s = self.cell_size
+            rect = pg.Rect(i * w, j * w, s, s)
+            
+            # Verificar si el mouse está sobre esta celda
+            mouse_pos = pg.mouse.get_pos() - self.start_pos
+            if rect.collidepoint(mouse_pos):
+                # Obtener imagen del objeto seleccionado
+                obj_img = self.scene.game.assets.images[self.selected_object]
+                obj_size = int(self.cell_size * 0.6)
+                scaled_obj = pg.transform.smoothscale(obj_img, (obj_size, obj_size))
+                
+                # Centrar la imagen del objeto en la celda
+                obj_rect = scaled_obj.get_rect(center=rect.center)
+                screen.blit(scaled_obj, obj_rect)
 
 class ObjectPanel:
 
@@ -233,7 +283,7 @@ class ObjectPanel:
         assets = self.game.assets
         self.items = {
             'bomb': {'id': 1, 'quantity': 1, 'image': assets.images["bomb"], 'info': "Bomba\nPuede destruir casillas en un rango de 3x3"},
-            'spyglass': {'id': 2, 'quantity': 1, 'image': assets.images["spyglass"], 'info': "Catalejo\nPuede ver casillas en un rango de 3x3"},
+            'spyglass': {'id': 2, 'quantity': 1, 'image': assets.images["spyglass"], 'info': "Catalejo\nPuede ver una casilla adicional"},
             'torpedo': {'id': 3, 'quantity': 1, 'image': assets.images["torpedo"], 'info': "Torpedo\nEs lanzado en línea recta desde el borde para destruir la primera casilla que encuentre"}
         }
         self.setup()
@@ -433,6 +483,16 @@ class MenuScene(Scene):
         self.ui.add_button("historial", (200, 100), action_historial, "Historial", center=history_center)
 
     def update(self, screen):
+        # Dibujar título
+        title_img = self.game.assets.images["title"]
+        title_width = 400
+        title_height = int(title_width * title_img.get_height() / title_img.get_width())
+        scaled_title = pg.transform.smoothscale(title_img, (title_width, title_height))
+        
+        title_x = (WIDTH - title_width) // 2
+        title_y = HEIGHT // 4 - title_height // 2
+        screen.blit(scaled_title, (title_x, title_y))
+        
         self.ui.update(screen)
 
 class HistoryScene(Scene):
@@ -512,7 +572,93 @@ class MatchScene(Scene):
         self.init_match(grid, objects)
 
     def handle_click(self, pos):
+        # Verificar si el clic está en el panel de objetos
+        panel_x = WIDTH // 4 - self.object_panel.width // 2
+        panel_y = HEIGHT // 3 + self.gridB.grid_height // 2 + 20
+        panel_rect = pg.Rect(panel_x, panel_y, self.object_panel.width, self.object_panel.height)
+        
+        if panel_rect.collidepoint(pos):
+            self.handle_object_panel_click(pos)
+            return True
+            
+        # Si hay un objeto seleccionado, manejar clic en la cuadrícula
+        if self.selected_object:
+            self.handle_grid_object_click(pos)
+            return True
+            
+        # Manejo normal de clic en la cuadrícula enemiga
         self.gridA.handle_click(pos)
+
+    def handle_object_panel_click(self, pos):
+        # Convertir posición global a posición local del panel
+        local_pos = (pos[0] - self.object_panel.panel_x, pos[1] - self.object_panel.panel_y)
+        
+        # Calcular diseño de cuadrícula del panel
+        cell_width = self.object_panel.width // 3
+        cell_height = 90
+        padding = 10
+        
+        # Verificar clic en cada elemento
+        for i, (item_name, item) in enumerate(self.object_panel.items.items()):
+            if item['quantity'] <= 0:
+                continue
+                
+            col = i % 3
+            row = i // 3
+            
+            # Calcular posición de la caja
+            box_rect = pg.Rect(
+                col * cell_width + padding,
+                row * cell_height + padding,
+                cell_width - padding * 2,
+                cell_height - padding * 2
+            )
+            
+            if box_rect.collidepoint(local_pos):
+                # Seleccionar este objeto
+                self.selected_object = item_name
+                self.gridA.set_selected_object(item_name)
+                hover_sound = self.game.assets.audio["sfx"]["hover"]
+                hover_sound.play()
+                return
+
+    def handle_grid_object_click(self, pos):
+        # Verificar si el clic está en la cuadrícula enemiga
+        mouse_vec = pg.Vector2(pos) - self.gridA.start_pos
+        for i in range(self.gridA.size[0]):
+            for j in range(self.gridA.size[1]):
+                w = self.gridA.cell_size + self.gridA.margin
+                s = self.gridA.cell_size
+                rect = pg.Rect(i * w, j * w, s, s)
+                if rect.collidepoint(mouse_vec):
+                    # Usar el objeto seleccionado en esta posición
+                    self.use_object_at_position(i, j)
+                    return
+
+    def use_object_at_position(self, x, y):
+        if not self.selected_object or self.object_panel.items[self.selected_object]['quantity'] <= 0:
+            return
+            
+        # Decrementar cantidad
+        self.object_panel.items[self.selected_object]['quantity'] -= 1
+
+        # Agregar objeto usado a la lista del turno
+        self.used_objects.append({
+            'object_id': self.object_panel.items[self.selected_object]['id'],
+            'x': x,
+            'y': y
+        })
+        
+        # Agregar objeto a la lista de objetos colocados para mostrar visualmente
+        self.placed_objects.append({
+            'object_name': self.selected_object,
+            'x': x,
+            'y': y
+        })
+        
+        # Limpiar selección
+        self.selected_object = None
+        self.gridA.set_selected_object(None)
 
     def save_config(self):
 
@@ -558,12 +704,34 @@ class MatchScene(Scene):
 
         if DEV or not os.path.exists("main.exe"):
             # gcc TDAS/*.c main.c -o main.exe
-            subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"])
+            try:
+                result = subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"], 
+                                      capture_output=True, text=True, check=True)
+                print("Compilación exitosa")
+            except subprocess.CalledProcessError as e:
+                print(f"Error de compilación: {e}")
+                print(f"stdout: {e.stdout}")
+                print(f"stderr: {e.stderr}")
+                return
+            except FileNotFoundError:
+                print("Error: gcc no encontrado. Asegúrate de tener GCC instalado.")
+                return
 
-        pipe = subprocess.PIPE
-        self.proc = subprocess.Popen(["./main.exe", "iniciarJuego", f"{self.id}.txt"], stdin=pipe, stdout=pipe, stderr=pipe, text=True, encoding='utf-8')
-        print(self.proc.stdout.readline(), end='')
-
+        try:
+            pipe = subprocess.PIPE
+            self.proc = subprocess.Popen(["./main.exe", "iniciarJuego", f"{self.id}.txt"], 
+                                       stdin=pipe, stdout=pipe, stderr=pipe, text=True, encoding='utf-8')
+            
+            # Leer la primera línea de respuesta
+            first_response = self.proc.stdout.readline()
+            if first_response:
+                print(first_response, end='')
+            else:
+                print("Error: No se recibió respuesta del backend")
+                
+        except Exception as e:
+            print(f"Error al iniciar el backend: {e}")
+            self.proc = None
 
     def init_match(self, grid, objects):
 
@@ -574,6 +742,15 @@ class MatchScene(Scene):
         # Agregar panel de objetos para uso en juego
         self.object_panel = ObjectPanel(self.game, WIDTH // 4, HEIGHT // 6)
         self.object_panel.set_items(objects)
+        
+        # Estado de selección de objetos
+        self.selected_object = None
+        
+        # Lista de objetos usados en este turno
+        self.used_objects = []
+        
+        # Lista de objetos colocados en la cuadrícula (para mostrar visualmente)
+        self.placed_objects = []
 
         self.fog_list = []
         x_step = self.gridA.grid_width // 5
@@ -595,34 +772,86 @@ class MatchScene(Scene):
         self.turn_ended = False
 
     def end_turn(self):
-        if self.gridA.selected_target is not None:
-            msg = '8 1\n' # Nuevo Turno - 1 mensaje
-            msg += f"4 {self.gridA.selected_target[0]} {self.gridA.selected_target[1]}\n" # Ataque - CoordX, CoordY
+        if self.gridA.selected_target is not None or self.used_objects:
+            # Verificar si el proceso backend existe
+            if self.proc is None:
+                print("Error: No hay proceso backend activo")
+                # Limpiar estado del turno sin enviar mensajes
+                self.gridA.clear_target()
+                self.used_objects = []
+                self.placed_objects = []
+                self.turn_ended = True
+                return
+            
+            # Verificar si el proceso backend sigue vivo
+            if self.proc.poll() is not None:
+                print("Error: El proceso backend ha terminado inesperadamente")
+                # Limpiar estado del turno sin enviar mensajes
+                self.gridA.clear_target()
+                self.used_objects = []
+                self.placed_objects = []
+                self.turn_ended = True
+                return
+            
+            # Calcular número total de mensajes
+            num_messages = 0
+            
+            if self.gridA.selected_target is not None:
+                num_messages += 1  # Mensaje de ataque
+                
+            num_messages += len(self.used_objects)  # Mensajes de objetos usados
+            
+            # Enviar mensaje de nuevo turno
+            msg = f'8 {num_messages}\n'
+            
+            # Enviar mensaje de ataque si hay objetivo seleccionado
+            if self.gridA.selected_target is not None:
+                msg += f"4 {self.gridA.selected_target[0]} {self.gridA.selected_target[1]}\n"
+            
+            # Enviar mensajes de objetos usados
+            for obj in self.used_objects:
+                msg += f"5 {obj['object_id']} {obj['x']} {obj['y']}\n"
+            
             print(msg, end='')
             
-            self.proc.stdin.write(msg)
-            self.proc.stdin.flush()
+            try:
+                self.proc.stdin.write(msg)
+                self.proc.stdin.flush()
+            except (OSError, IOError) as e:
+                print(f"Error al enviar mensaje al backend: {e}")
+                # Limpiar estado del turno sin enviar mensajes
+                self.gridA.clear_target()
+                self.used_objects = []
+                self.placed_objects = []
+                self.turn_ended = True
+                return
 
-            # Leer la primera línea (debería ser "8 1" para número de mensajes)
-            first_line = self.proc.stdout.readline().strip()
-            
-            # Analizar el número de mensajes
-            if first_line.startswith("8 "):
-                num_messages = int(first_line.split()[1])
-                print(first_line)
+            try:
+                # Leer la primera línea (debería ser "8 X" para número de mensajes)
+                first_line = self.proc.stdout.readline().strip()
                 
-                # Leer todos los mensajes
-                for i in range(num_messages):
-                    message = self.proc.stdout.readline().strip()
-                    print(message, end='\n')
+                # Analizar el número de mensajes
+                if first_line.startswith("8 "):
+                    num_messages = int(first_line.split()[1])
+                    print(first_line)
+                    
+                    # Leer todos los mensajes
+                    for i in range(num_messages):
+                        message = self.proc.stdout.readline().strip()
+                        print(message, end='\n')
 
-                    message_type = int(message.split()[0])
-                    if message_type == 9: # Informe de Estado Casilla
-                        x, y, value = map(int, message.split()[1:])
-                        self.gridA.update_cell(x, y, value)
-                    # Aquí puedes procesar cada mensaje según sea necesario
+                        message_type = int(message.split()[0])
+                        if message_type == 9: # Informe de Estado Casilla
+                            x, y, value = map(int, message.split()[1:])
+                            self.gridA.update_cell(x, y, value)
+                        # Aquí puedes procesar cada mensaje según sea necesario
+            except (OSError, IOError) as e:
+                print(f"Error al leer respuesta del backend: {e}")
             
+            # Limpiar estado del turno
             self.gridA.clear_target()
+            self.used_objects = []  # Limpiar lista de objetos usados
+            self.placed_objects = []  # Limpiar lista de objetos colocados visualmente
             self.turn_ended = True
 
     def draw_fog(self, screen, box):
@@ -695,7 +924,8 @@ class SetupScene(Scene):
         
         if not unplaced_boats:
             # Todos los barcos ya están colocados, solo reproducir sonido de denegación
-            pg.mixer.Sound(self.game.assets.audio["music"]["deny"]).play()
+            deny_sound = self.game.assets.audio["sfx"]["deny"]
+            deny_sound.play()
             return
         
         # Intentar colocar cada barco no colocado aleatoriamente
@@ -745,7 +975,8 @@ class SetupScene(Scene):
                 continue
         
         # Reproducir efecto de sonido
-        pg.mixer.Sound(self.game.assets.audio["music"]["create"]).play()
+        create_sound = self.game.assets.audio["sfx"]["create"]
+        create_sound.play()
 
     def is_cell_empty(self, x, y):
         """Verificar si una celda está vacía (ningún barco la ocupa)"""
@@ -776,8 +1007,8 @@ class SetupScene(Scene):
             boat['selected'] = False
         
         # Reproducir efecto de sonido
-        destroy_sound = self.game.assets.audio["music"]["destroy"]
-        pg.mixer.Sound(destroy_sound).play()
+        destroy_sound = self.game.assets.audio["sfx"]["destroy"]
+        destroy_sound.play()
 
     def start_match(self):
         self.game.scenes["match"]
@@ -798,8 +1029,8 @@ class SetupScene(Scene):
         if not self.grid.preview_pos:
             return
         
-        create_sound = self.game.assets.audio["music"]["create"]
-        pg.mixer.Sound(create_sound).play()
+        create_sound = self.game.assets.audio["sfx"]["create"]
+        create_sound.play()
             
         # Colocar el barco
         selected_boat['pos'] = self.grid.preview_pos
@@ -1011,7 +1242,8 @@ class UIManager:
             
             # Play hover sound when mouse enters the button
             if is_hovering and not self.was_hovering[name]:
-                pg.mixer.Sound(self.game.assets.audio["music"]["hover"]).play()
+                hover_sound = self.game.assets.audio["sfx"]["hover"]
+                hover_sound.play()
             
             self.was_hovering[name] = is_hovering
             
@@ -1050,6 +1282,10 @@ class Game:
     def __init__(self, win_size):
         self.running = True
         pg.mixer.init()
+        
+        # Configurar volumen general (0.0 a 1.0)
+        pg.mixer.music.set_volume(0.3)  # Volumen para música de fondo
+        
         self.win_size = win_size
         self.frame = 0
 
@@ -1149,12 +1385,16 @@ class AssetManager:
         self.audio = {
             "music": {
                 "main": "assets/audio/menu.mp3",
-                "hover": "assets/audio/hover.wav",
-                "create": "assets/audio/create.wav",
-                "deny": "assets/audio/deny.wav",
-                "destroy": "assets/audio/destroy.wav",
+            },
+            "sfx": {
+                "hover": pg.mixer.Sound("assets/audio/hover.wav"),
+                "create": pg.mixer.Sound("assets/audio/create.wav"),
+                "deny": pg.mixer.Sound("assets/audio/deny.wav"),
+                "destroy": pg.mixer.Sound("assets/audio/destroy.wav"),
             }
         }
+        for audio in self.audio["sfx"].values():
+            audio.set_volume(0.1)
 
         self.images = {
             "menu": pg.image.load("assets/img/menu.png").convert_alpha(),
@@ -1165,6 +1405,7 @@ class AssetManager:
             "broken": pg.image.load("assets/img/broken.png").convert_alpha(),
             "dice": pg.image.load("assets/img/dice.png").convert_alpha(),
             "clear": pg.image.load("assets/img/clear.png").convert_alpha(),
+            "title": pg.image.load("assets/img/tittle.png").convert_alpha(),
         }
 
         self.animations = {
@@ -1181,7 +1422,7 @@ class Engine:
 
     def setup(self):
         pg.init()
-        pg.display.set_caption("Battleship")
+        pg.display.set_caption("ByteWave")
         self.screen = pg.display.set_mode((WIDTH, HEIGHT))
         self.clock = pg.time.Clock()
 

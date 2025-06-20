@@ -328,83 +328,78 @@ Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List
     return barco;
 }
 
-void usarObjeto(int ID, int CoorX, int CoorY, Tablero *TableroRival, int Orientacion)
+void usarObjeto(Partida *partida, char *buffer)
 {
 
-    if (!TableroRival || !TableroRival->valores)
-    {
-        printf("ERROR: Tablero no encontrado\n");
-        return;
-    }
+    int code, ID;
+    sscanf(buffer, "%*d %d", &ID);
+
+    Jugador *jugador = list_first(partida->jugadores);
+    Jugador *bot = list_next(partida->jugadores);
 
     switch (ID)
     {
     case 1:
     { // Bomba
-        printf("INICIO BOMBA: %d,%d\n", CoorX, CoorY);
+
+        int CoorX, CoorY, Orientacion;
+        if (sscanf(buffer, "%*d %*d %d %d", &CoorX, &CoorY) != 2)
+        {
+            puts("Error: No se ingresaron parámetros válidos para el objeto");
+            return;
+        }
+
         for (int j = CoorY - 1; j <= CoorY + 1; j++)
         {
             for (int i = CoorX - 1; i <= CoorX + 1; i++)
             {
-                if (i >= 0 && i < TableroRival->ancho && j >= 0 && j < TableroRival->alto)
+                if (i >= 0 && i < bot->tablero->ancho && j >= 0 && j < bot->tablero->alto)
                 {
-                    int celda_actual = TableroRival->valores[j][i];
-
-                    if (celda_actual > 0)
-                    {
-                        TableroRival->valores[j][i] = -2;
-                        printf("IMPACTO BOMBA: %d,%d\n", i, j);
-                    }
-                    else if (celda_actual == 0)
-                    {
-                        TableroRival->valores[j][i] = -1;
-                        printf("FALLO BOMBA: %d,%d\n", i, j);
-                    }
+                    aplicarAtaque(partida, j, i);
                 }
             }
         }
-        printf("FIN BOMBA\n");
         break;
     }
 
     case 2:
     { // Catalejo
-        printf("INICIO CATALEJO:%d,%d\n", CoorX, CoorY);
-        for (int j = CoorY - 1; j <= CoorY + 1; j++)
+        int CoorX, CoorY;
+        if (sscanf(buffer, "%*d %*d %d %d", &CoorX, &CoorY) != 2)
         {
-            for (int i = CoorX - 1; i <= CoorX + 1; i++)
-            {
-                if (i >= 0 && i < TableroRival->ancho && j >= 0 && j < TableroRival->alto)
-                {
-                    int contenido = TableroRival->valores[j][i];
-                    if (contenido > 0)
-                    {
-                        printf("CELDA: %d,%d, BARCO ID: %d\n", i, j, contenido);
-                    }
-                    else if (contenido == 0)
-                    {
-                        printf("CELDA: %d,%d, AGUA\n", i, j);
-                    }
-                    else if (contenido == -1)
-                    {
-                        printf("CELDA: %d,%d, FALLO\n", i, j);
-                    }
-                    else if (contenido == -2)
-                    {
-                        printf("CELDA: %d,%d, GOLPE\n", i, j);
-                    }
-                }
-            }
+            puts("Error: No se ingresaron parámetros válidos para el objeto");
+            return;
         }
-        printf("FIN CATALEJO\n");
+
+        informarCasilla(partida, CoorX, CoorY);
+        
         break;
     }
 
     case 3:
     { // Torpedo
-        printf("INICIO TORPEDO: %d,%d,%d\n", CoorX, CoorY, Orientacion);
-        // Codigo del torpedo xd
-        printf("FIN TORPEDO\n");
+        int CoorX, CoorY, Orientacion;
+        if (sscanf(buffer, "%*d %*d %d %d %d", &CoorX, &CoorY, &Orientacion) != 3)
+        {
+            puts("Error: No se ingresaron parámetros válidos para el objeto");
+            return;
+        }
+        
+        // Aplicar torpedo en la dirección especificada
+        if (Orientacion == 0) // Horizontal
+        {
+            for (int i = CoorX; i < bot->tablero->ancho; i++)
+            {
+                aplicarAtaque(partida, i, CoorY);
+            }
+        }
+        else if (Orientacion == 1) // Vertical
+        {
+            for (int j = CoorY; j < bot->tablero->alto; j++)
+            {
+                aplicarAtaque(partida, CoorX, j);
+            }
+        }
         break;
     }
 
@@ -475,6 +470,8 @@ Partida *leerConfiguracion(const char *archivo)
         printf("Error: No se pudo asignar memoria para el bot\n");
         list_clean(partida->jugadores);
         free(partida);
+        fclose(file);
+        return NULL;
     }
 
     Jugador *usuario = (Jugador *)malloc(sizeof(Jugador));
@@ -729,8 +726,20 @@ int mostrarAyuda()
     printf("Battleship Game - Ayuda\n");
     printf("======================\n\n");
     printf("Uso: <accion> [parametros]\n\n");
-
-    // ...
+    printf("Acciones disponibles:\n");
+    printf("  iniciarJuego <archivo_configuracion> - Inicia una nueva partida\n");
+    printf("  buscarPartida <id_partida> - Muestra el historial de una partida\n");
+    printf("  ayuda - Muestra esta ayuda\n\n");
+    printf("Formato de entrada durante el juego:\n");
+    printf("  <codigo_turno> <numero_acciones>\n");
+    printf("  <tipo_accion> [parametros]\n\n");
+    printf("Tipos de acción:\n");
+    printf("  4 <x> <y> - Ataque en coordenadas (x,y)\n");
+    printf("  5 <id_objeto> <x> <y> <orientacion> - Usar objeto\n\n");
+    printf("Objetos disponibles:\n");
+    printf("  1 - Bomba (ataca área 3x3)\n");
+    printf("  2 - Catalejo (revela área 3x3)\n");
+    printf("  3 - Torpedo (ataca en línea)\n");
     return 0;
 }
 
@@ -762,6 +771,13 @@ void cargarHistorial(Partida *partida)
     char linea[256];
     while (fgets(linea, sizeof(linea), f))
     {
+        // Remove newline character if present
+        size_t len = strlen(linea);
+        if (len > 0 && linea[len-1] == '\n')
+        {
+            linea[len-1] = '\0';
+        }
+        
         char prefix[4];
         int tipo, x, y;
 
@@ -796,17 +812,26 @@ void registrarMovimientoArchivo(const char *rutaArchivo, Movimiento *mov)
     fclose(file);
 }
 
-void leerAtaque(Partida *partida, char *buffer)
+void informarCasilla(Partida *partida, int x, int y)
 {
-    int codigo;
-    int x, y;
+    Jugador *usuario = list_first(partida->jugadores);
+    Jugador *bot = list_next(partida->jugadores);
 
-    if (sscanf(buffer, "%d %d %d", &codigo, &x, &y) != 3)
+    int valor = bot->tablero->valores[y][x];
+
+    if (valor == 0)
     {
-        puts("Error: No se ingresaron dos coordenadas correctas");
-        exit(1);
+        bot->tablero->valores[y][x] = 99;
+        valor = 99;
     }
 
+    char *mensaje = malloc(sizeof(char) * 256);
+    sprintf(mensaje, "9 %d %d %d", x, y, valor); // Informe de estado de casilla
+    list_pushBack(partida->mensajesEstado, mensaje);
+}
+
+void aplicarAtaque(Partida *partida, int x, int y)
+{
     Jugador *usuario = list_first(partida->jugadores);
     Jugador *bot = list_next(partida->jugadores);
 
@@ -819,46 +844,40 @@ void leerAtaque(Partida *partida, char *buffer)
     if (x >= 0 && x < ancho && y >= 0 && y < alto)
     {
         valor = bot->tablero->valores[y][x];
+        
+        // Check if this cell has already been attacked
+        if (valor == 99 || valor < 0)
+        {
+            // Cell already attacked, don't attack again
+            free(mensaje);
+            return;
+        }
+        
         if (valor > 0) // Impacto a un barco
-            valor = -valor;
-
+        {
+            valor = -valor; // Mark as hit
+        }
         else if (valor == 0)
+        {
             valor = 99; // Impacto al agua
-
+        }
         else
         {
             puts("Error: La coordenada ingresada no es válida :()\n");
+            free(mensaje);
             exit(1);
         }
     }
     else
     {
         puts("Coordenada fuera de rango :(\n");
+        free(mensaje);
         exit(1);
     }
 
     bot->tablero->valores[y][x] = valor;
+    informarCasilla(partida, x, y);
 
-    sprintf(mensaje, "9 %d %d %d", x, y, valor); // Informe de estado de casilla
-    list_pushBack(partida->mensajesEstado, mensaje);
-}
-
-void leerObjeto(Partida *partida, char *buffer)
-{
-
-    int codigo;
-    int id_objeto, x, y, orientacion;
-
-    if (sscanf(buffer, "%d %d %d %d %d", &codigo, &id_objeto, &x, &y, &orientacion) != 5)
-    {
-        puts("Error: No se ingresaron cuatro opciones correctas");
-        exit(1);
-    }
-
-    Jugador *usuario = list_first(partida->jugadores);
-    Jugador *bot = list_next(partida->jugadores);
-
-    usarObjeto(id_objeto, x, y, bot->tablero, orientacion);
 }
 
 void leerAccion(Partida *partida, char *buffer)
@@ -874,8 +893,13 @@ void leerAccion(Partida *partida, char *buffer)
     if (tipo_accion == 4)
     {
         int x, y;
-        sscanf(buffer, "%*d %d %d", &x, &y);
-        leerAtaque(partida, buffer);
+        if (sscanf(buffer, "%*d %d %d", &x, &y) != 2)
+        {
+            puts("Error: No se ingresaron coordenadas válidas para el ataque");
+            return;
+        }
+        
+        aplicarAtaque(partida, x, y);
 
         Movimiento *mov = malloc(sizeof(Movimiento));
         if (!mov)
@@ -893,11 +917,10 @@ void leerAccion(Partida *partida, char *buffer)
     }
     else if (tipo_accion == 5)
     {
-        int id_obj, x, y, orient;
-        sscanf(buffer, "%*d %d %d %d %d", &id_obj, &x, &y, &orient);
 
-        leerObjeto(partida, buffer);
+        usarObjeto(partida, buffer);
 
+        /* 
         Movimiento *mov = malloc(sizeof(Movimiento));
         if (!mov)
             return;
@@ -909,8 +932,8 @@ void leerAccion(Partida *partida, char *buffer)
         stack_push(partida->historial, mov);
 
         char path[256];
-        snprintf(path, sizeof(path), "cache/%s", partida->id);
-        registrarMovimientoArchivo(path, mov);
+        snprintf(path, sizeof(path), "cache/%s.txt", partida->id);
+        registrarMovimientoArchivo(path, mov); */
     }
     else
     {
@@ -936,7 +959,19 @@ void leerTurno(Partida *partida, char *eleccion)
     for (int i = 0; i < n_acciones; i++)
     {
         char buffer[256];
-        fgets(buffer, sizeof(buffer), stdin);
+        if (fgets(buffer, sizeof(buffer), stdin) == NULL)
+        {
+            puts("Error: No se pudo leer la entrada");
+            return;
+        }
+        
+        // Remove newline character if present
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len-1] == '\n')
+        {
+            buffer[len-1] = '\0';
+        }
+        
         leerAccion(partida, buffer);
     }
 
@@ -961,6 +996,13 @@ int iniciarJuego(const char *archivo)
     char buffer[256];
     while (fgets(buffer, sizeof(buffer), stdin))
     {
+        // Remove newline character if present
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len-1] == '\n')
+        {
+            buffer[len-1] = '\0';
+        }
+        
         leerTurno(partida, buffer);
         fflush(stdout);
     }
@@ -1020,6 +1062,13 @@ int main(int n_args, char *args[])
         char linea[128];
         while (fgets(linea, sizeof(linea), file))
         {
+            // Remove newline character if present
+            size_t len = strlen(linea);
+            if (len > 0 && linea[len-1] == '\n')
+            {
+                linea[len-1] = '\0';
+            }
+            
             if (strncmp(linea, "MOV", 3) == 0)
             {
                 int tipo, x, y;
