@@ -609,6 +609,79 @@ Partida *leerConfiguracion(const char *archivo)
     return partida;
 }
 
+int mostrarAyuda()
+{
+    printf("Battleship Game - Ayuda\n");
+    printf("======================\n\n");
+    printf("Uso: <accion> [parametros]\n\n");
+
+    // ...
+    return 0;
+}
+
+void leerAccion(Partida *partida, char *eleccion){
+    Jugador *usuario = list_first(partida->jugadores);
+    Jugador *bot = list_next(partida->jugadores);
+
+    if (!usuario || !bot || !bot->tablero || !bot->tablero->valores) {
+        printf("Error: No se encontraron jugadores en la partida\n");
+        return;
+    }
+
+    int eleccion_int;
+    if (sscanf(eleccion, "%d", &eleccion_int) != 1) {
+        puts("Error: La elección no es correcta");
+        return;
+    }
+
+    if (eleccion_int == 4){ // 4 Es para atacar
+        int x, y;
+        printf("Ingrese la coordenada (x, y) del ataque: ");
+        if (sscanf(eleccion, "%d %d %d", &x, &y) != 2){
+            puts("Error: No se ingresaron dos coordenadas correctas");
+            return;
+        }
+        if (x < 0 || x >= bot->tablero->ancho || y < 0 || y >= bot->tablero->alto) {
+            puts("Error: Coordenadas fuera de los límites del tablero");
+            return;
+        }
+        int valor = bot->tablero->valores[y][x];
+        if (valor > 0) {
+            bot->tablero->valores[y][x] = -valor;   // Impacto al barco
+            printf("Ha alcanzado un barco en la posición (%d, %d) ! !\n", x, y);
+        }
+        else if (valor == 0) {
+            bot->tablero->valores[y][x] = 99;   // Impacto al agua
+            printf("Ha fallado el ataque en la posición (%d, %d) ! !\n", x, y);
+        }
+        else {
+            puts("Error: Ya ha atacado esta posición");
+        }
+    }
+    else if (eleccion_int == 5){
+        int id_obj, x, y, ori;
+        printf("Ingrese el id del objeto, la coordenada (x, y) y la orientacion (0 para horizontal, 1 para vertical): ");
+        if (scanf("%d %d %d %d", &id_obj, &x, &y, &ori) != 4){
+            puts("Error: No se ingresaron cuatro opciones correctas");
+            puts("Intentelo nuevamente...\n");
+            return;
+        }
+        if (x < 0 || x >= bot->tablero->ancho || y < 0 || y >= bot->tablero->alto) {
+            puts("Error: Coordenadas fuera de los límites del tablero");
+            return;
+        }
+        if (ori < 0 || ori > 1) {
+            puts("Error: Orientación debe ser 0 (horizontal) o 1 (vertical)");
+            return;
+        }
+        usarObjeto(id_obj, x, y, bot->tablero, ori);
+    }
+    else {
+        mostrarAyuda();
+    }
+}
+
+
 int iniciarJuego(const char *archivo)
 {
     char fullpath[256];
@@ -637,69 +710,6 @@ int iniciarJuego(const char *archivo)
     }
 
     free(partida);
-    return 0;
-}
-
-void leerAccion(Partida *partida, char *eleccion){
-    Jugador *usuario = list_first(partida->jugadores);
-    Jugador *bot = list_next(partida->jugadores);
-
-    if (!usuario || !bot) {
-        printf("Error: No se encontraron jugadores en la partida\n");
-        return;
-    }
-
-    int eleccion_int;
-    if (sscanf(eleccion, "%d", &eleccion_int) != 1) {
-        puts("Error: La elección no es correcta");
-        puts("Intentelo nuevamente...\n");
-        return;
-    }
-
-    if (eleccion_int == 4){ // 4 Es para atacar cierto?
-        int x, y;
-        printf("Ingrese la coordenada (x, y) del ataque: ");
-        if (scanf("%d %d", &x, &y) != 2){
-            puts("Error: No se ingresaron dos coordenadas correctas");
-            return;
-        }
-        if (x >= 0 && x < bot->tablero->ancho && y >= 0 && y < bot->tablero->alto){
-            int valor = bot->tablero->valores[y][x];
-            if (valor > 0){ // Impacto a un barco
-                bot->tablero->valores[y][x] = -valor;
-                printf("El barco ha sido impacatado en (%d, %d)!! \n", x, y);
-            } else if (valor == 0){
-                bot->tablero->valores[y][x] = 99; // Impacto al agua
-                printf("El ataque ha impactado al agua en (%d, %d)!!", x, y);
-            } else {
-                puts("Error: La coordenada ingresada no es válida :()\n");
-            }
-        } else {
-            puts("Coordenada fuera de rango :(\n");
-        }
-    }
-    else if (eleccion_int == 5){
-        int id_obj, x, y, ori;
-        printf("Ingrese el id del objeto, la coordenada (x, y) y la orientacion (0 para horizontal, 1 para vertical): ");
-        if (scanf("%d %d %d %d", &id_obj, &x, &y, &ori) != 4){
-            puts("Error: No se ingresaron cuatro opciones correctas");
-            puts("Intentelo nuevamente...\n");
-            return;
-        }
-        usarObjeto(id_obj, x, y, bot->tablero, ori);
-    }
-    else {
-        mostrarAyuda();
-    }
-}
-
-int mostrarAyuda()
-{
-    printf("Battleship Game - Ayuda\n");
-    printf("======================\n\n");
-    printf("Uso: <accion> [parametros]\n\n");
-
-    // ...
     return 0;
 }
 
