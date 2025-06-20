@@ -355,7 +355,7 @@ void usarObjeto(Partida *partida, char *buffer)
             {
                 if (i >= 0 && i < bot->tablero->ancho && j >= 0 && j < bot->tablero->alto)
                 {
-                    aplicarAtaque(partida, j, i);
+                    aplicarAtaque(partida, i, j);
                 }
             }
         }
