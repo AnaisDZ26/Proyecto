@@ -7,25 +7,28 @@
 #include "TDAS/map.h"
 #include "TDAS/stack.h"
 
-#define ID_LENGTH 5 
-#define MAX_GRID 20  // Tamaño máximo permitido de la cuadrícula
+#define ID_LENGTH 5
+#define MAX_GRID 20 // Tamaño máximo permitido de la cuadrícula
 
-typedef struct{
+typedef struct
+{
     int x;
     int y;
     int tamano;
     int orientacion; // 0 - Horizontal. 1 - Vertical.
-    int id;         // ID del barco
+    int id;          // ID del barco
 } Barco;
 
-typedef struct {
+typedef struct
+{
     int **valores;
     List *barcos;
     int ancho;
     int alto;
 } Tablero;
 
-typedef struct {
+typedef struct
+{
     Tablero *tablero;
     List *objetos;
 } Jugador;
@@ -35,30 +38,39 @@ typedef struct
     char id[ID_LENGTH + 1]; // +1 para el terminador nulo
     List *jugadores;
     List *mensajesEstado;
+    Stack *historial;
 } Partida;
 
-typedef struct {
+typedef struct
+{
     int CoorX;
     int CoorY;
     int TypeMov; // 4 - Ataque. 5 - Usar Objeto.
 } Movimiento;
 
 // Función para imprimir un tablero
-void imprimirTablero(Tablero *tablero, int es_bot) {
+void imprimirTablero(Tablero *tablero, int es_bot)
+{
     printf("\nTablero del %s:\n", es_bot ? "Bot" : "Jugador");
     printf("  ");
-    for (int j = 0; j < tablero->ancho; j++) {
+    for (int j = 0; j < tablero->ancho; j++)
+    {
         printf("%2d ", j);
     }
     printf("\n");
 
-    for (int i = 0; i < tablero->alto; i++) {
+    for (int i = 0; i < tablero->alto; i++)
+    {
         printf("%2d ", i);
-        for (int j = 0; j < tablero->ancho; j++) {
-            if (es_bot) {
+        for (int j = 0; j < tablero->ancho; j++)
+        {
+            if (es_bot)
+            {
                 // Para el tablero del bot, mostrar los valores reales (IDs de barcos)
                 printf("%2d ", tablero->valores[i][j]);
-            } else {
+            }
+            else
+            {
                 // Para el tablero del jugador, mostrar todos los barcos
                 printf("%2d ", tablero->valores[i][j]);
             }
@@ -68,22 +80,26 @@ void imprimirTablero(Tablero *tablero, int es_bot) {
 }
 
 // Función para imprimir información de los barcos
-void imprimirBarcos(List *barcos) {
+void imprimirBarcos(List *barcos)
+{
     printf("\nBarcos:\n");
     printf("ID | Tamano | Orientacion | Posicion\n");
     printf("--------------------------------\n");
-    
-    for (Barco *b = list_first(barcos); b != NULL; b = list_next(barcos)) {
-        printf("%2d | %6d | %10s | (%d,%d)\n", 
-               b->id, 
-               b->tamano, 
+
+    for (Barco *b = list_first(barcos); b != NULL; b = list_next(barcos))
+    {
+        printf("%2d | %6d | %10s | (%d,%d)\n",
+               b->id,
+               b->tamano,
                b->orientacion == 0 ? "Horizontal" : "Vertical",
                b->x, b->y);
     }
 }
 
-void verEstadoPartida(Partida *partida) {
-    if (!partida) {
+void verEstadoPartida(Partida *partida)
+{
+    if (!partida)
+    {
         printf("Error: No hay partida activa\n");
         return;
     }
@@ -95,7 +111,8 @@ void verEstadoPartida(Partida *partida) {
     Jugador *jugador = list_first(partida->jugadores);
     Jugador *bot = list_next(partida->jugadores);
 
-    if (!jugador || !bot) {
+    if (!jugador || !bot)
+    {
         printf("Error: No se encontraron los jugadores\n");
         return;
     }
@@ -109,12 +126,14 @@ void verEstadoPartida(Partida *partida) {
     imprimirBarcos(bot->tablero->barcos);
 
     // Print objects if any
-    if (list_size(jugador->objetos) > 0) {
+    if (list_size(jugador->objetos) > 0)
+    {
         printf("\nObjetos del jugador:\n");
         // TODO: Print objects when object structure is defined
     }
 
-    if (list_size(bot->objetos) > 0) {
+    if (list_size(bot->objetos) > 0)
+    {
         printf("\nObjetos del bot:\n");
         // TODO: Print objects when object structure is defined
     }
@@ -122,8 +141,9 @@ void verEstadoPartida(Partida *partida) {
     printf("\n=== Fin del Estado ===\n");
 }
 
-Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto){
-    Tablero *tablero = (Tablero *) malloc(sizeof(Tablero));
+Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto)
+{
+    Tablero *tablero = (Tablero *)malloc(sizeof(Tablero));
     if (!tablero)
     {
         printf("Error: No se pudo asignar memoria para el tablero\n");
@@ -135,19 +155,23 @@ Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto){
     tablero->alto = alto;
 
     // Inicializar cuadrícula con ceros
-    tablero->valores = (int **) malloc(tablero->alto * sizeof(int *));
-    if (!tablero->valores) {
+    tablero->valores = (int **)malloc(tablero->alto * sizeof(int *));
+    if (!tablero->valores)
+    {
         printf("Error: No se pudo asignar memoria para la cuadrícula\n");
         free(tablero);
         return NULL;
     }
 
-    for (int i = 0; i < tablero->alto; i++) {
-        tablero->valores[i] = (int *) malloc(tablero->ancho * sizeof(int));
-        if (!tablero->valores[i]) {
+    for (int i = 0; i < tablero->alto; i++)
+    {
+        tablero->valores[i] = (int *)malloc(tablero->ancho * sizeof(int));
+        if (!tablero->valores[i])
+        {
             printf("Error: No se pudo asignar memoria para la fila %d\n", i);
             // Liberar memoria previamente asignada
-            for (int j = 0; j < i; j++) {
+            for (int j = 0; j < i; j++)
+            {
                 free(tablero->valores[j]);
             }
             free(tablero->valores);
@@ -155,16 +179,19 @@ Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto){
             return NULL;
         }
         // Inicializar fila con ceros
-        for (int j = 0; j < tablero->ancho; j++) {
+        for (int j = 0; j < tablero->ancho; j++)
+        {
             tablero->valores[i][j] = 0;
         }
     }
 
     // Inicializar lista de barcos
     tablero->barcos = list_create();
-    if (!tablero->barcos) {
+    if (!tablero->barcos)
+    {
         printf("Error: No se pudo crear la lista de barcos\n");
-        for (int i = 0; i < tablero->alto; i++) {
+        for (int i = 0; i < tablero->alto; i++)
+        {
             free(tablero->valores[i]);
         }
         free(tablero->valores);
@@ -175,14 +202,17 @@ Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto){
     // Colocar barcos aleatoriamente, coincidiendo con los tamaños de los barcos del jugador
     srand(time(NULL));
     int boat_id = 1;
-    
+
     // Iterar a través de los barcos del jugador para coincidir con sus tamaños
-    for (Barco *player_boat = list_first(player_boats); player_boat != NULL; player_boat = list_next(player_boats)) {
-        Barco *barco = (Barco *) malloc(sizeof(Barco));
-        if (!barco) {
+    for (Barco *player_boat = list_first(player_boats); player_boat != NULL; player_boat = list_next(player_boats))
+    {
+        Barco *barco = (Barco *)malloc(sizeof(Barco));
+        if (!barco)
+        {
             printf("Error: No se pudo asignar memoria para el barco %d\n", boat_id);
             list_clean(tablero->barcos);
-            for (int i = 0; i < tablero->alto; i++) {
+            for (int i = 0; i < tablero->alto; i++)
+            {
                 free(tablero->valores[i]);
             }
             free(tablero->valores);
@@ -192,33 +222,38 @@ Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto){
 
         // Copiar tamaño del barco del jugador
         barco->tamano = player_boat->tamano;
-        barco->orientacion = rand() % 2;   // 0 para horizontal, 1 para vertical
+        barco->orientacion = rand() % 2; // 0 para horizontal, 1 para vertical
         barco->id = boat_id;
 
         // Intentar colocar el barco
-        int max_attempts = 100;  // Prevenir bucles infinitos
+        int max_attempts = 100; // Prevenir bucles infinitos
         int placed = 0;
-        
-        while (!placed && max_attempts > 0) {
+
+        while (!placed && max_attempts > 0)
+        {
             // Obtener posición inicial aleatoria
             barco->x = rand() % (tablero->ancho - (barco->orientacion ? 0 : barco->tamano - 1));
             barco->y = rand() % (tablero->alto - (barco->orientacion ? barco->tamano - 1 : 0));
 
             // Verificar si el barco puede ser colocado
             int can_place = 1;
-            for (int i = 0; i < barco->tamano && can_place; i++) {
+            for (int i = 0; i < barco->tamano && can_place; i++)
+            {
                 int x = barco->x + (barco->orientacion ? 0 : i);
                 int y = barco->y + (barco->orientacion ? i : 0);
 
                 // Verificar si la posición es válida y está vacía
-                if (x >= tablero->ancho || y >= tablero->alto || tablero->valores[y][x] != 0) {
+                if (x >= tablero->ancho || y >= tablero->alto || tablero->valores[y][x] != 0)
+                {
                     can_place = 0;
                 }
             }
 
-            if (can_place) {
+            if (can_place)
+            {
                 // Colocar el barco estableciendo los valores de la cuadrícula
-                for (int i = 0; i < barco->tamano; i++) {
+                for (int i = 0; i < barco->tamano; i++)
+                {
                     int x = barco->x + (barco->orientacion ? 0 : i);
                     int y = barco->y + (barco->orientacion ? i : 0);
                     // Establecer el valor de la celda al ID del barco
@@ -229,11 +264,13 @@ Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto){
             max_attempts--;
         }
 
-        if (!placed) {
+        if (!placed)
+        {
             printf("Error: No se pudo colocar el barco %d después de varios intentos\n", boat_id);
             free(barco);
             list_clean(tablero->barcos);
-            for (int i = 0; i < tablero->alto; i++) {
+            for (int i = 0; i < tablero->alto; i++)
+            {
                 free(tablero->valores[i]);
             }
             free(tablero->valores);
@@ -250,101 +287,130 @@ Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto){
 }
 
 // Función para manejar la creación y gestión de barcos para una celda
-Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List *barcos_temp, int *n_barcos) {
-    if (boat_id <= 0) return NULL;
+Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List *barcos_temp, int *n_barcos)
+{
+    if (boat_id <= 0)
+        return NULL;
 
     // Verificar si este barco ya existe en nuestra lista
     Barco *barco = NULL;
-    for (Barco *b = list_first(barcos_temp); b != NULL; b = list_next(barcos_temp)) {
-        if (b->id == boat_id) {
+    for (Barco *b = list_first(barcos_temp); b != NULL; b = list_next(barcos_temp))
+    {
+        if (b->id == boat_id)
+        {
             barco = b;
             break;
         }
     }
 
-    if (barco == NULL) {
+    if (barco == NULL)
+    {
         // Crear nuevo barco
         barco = (Barco *)malloc(sizeof(Barco));
-        if (!barco) {
+        if (!barco)
+        {
             printf("Error: No se pudo asignar memoria para el barco\n");
             return NULL;
         }
         barco->id = boat_id;
-        barco->x = j;  // Columna es x
-        barco->y = i;  // Fila es y
+        barco->x = j; // Columna es x
+        barco->y = i; // Fila es y
         barco->tamano = 1;
-        barco->orientacion = -1;  // No determinada aún
+        barco->orientacion = -1; // No determinada aún
         list_pushBack(barcos_temp, barco);
         (*n_barcos)++;
-    } else {
+    }
+    else
+    {
         // Actualizar barco existente
         barco->tamano++;
     }
     return barco;
 }
 
-void usarObjeto(int ID, int CoorX, int CoorY, Tablero *TableroRival, int Orientacion){
+void usarObjeto(int ID, int CoorX, int CoorY, Tablero *TableroRival, int Orientacion)
+{
 
-    if (!TableroRival || !TableroRival->valores) {
+    if (!TableroRival || !TableroRival->valores)
+    {
         printf("ERROR: Tablero no encontrado\n");
         return;
     }
 
     switch (ID)
     {
-    case 1: { // Bomba
-            printf("INICIO BOMBA: %d,%d\n", CoorX, CoorY);
-            for (int j = CoorY - 1; j <= CoorY + 1; j++) {
-                for (int i = CoorX - 1; i <= CoorX + 1; i++) {
-                    if (i >= 0 && i < TableroRival->ancho && j >= 0 && j < TableroRival->alto) {
-                        int celda_actual = TableroRival->valores[j][i];
+    case 1:
+    { // Bomba
+        printf("INICIO BOMBA: %d,%d\n", CoorX, CoorY);
+        for (int j = CoorY - 1; j <= CoorY + 1; j++)
+        {
+            for (int i = CoorX - 1; i <= CoorX + 1; i++)
+            {
+                if (i >= 0 && i < TableroRival->ancho && j >= 0 && j < TableroRival->alto)
+                {
+                    int celda_actual = TableroRival->valores[j][i];
 
-                        if (celda_actual > 0) {
-                            TableroRival->valores[j][i] = -2;
-                            printf("IMPACTO BOMBA: %d,%d\n", i, j);
-                        } else if (celda_actual == 0) {
-                            TableroRival->valores[j][i] = -1;
-                            printf("FALLO BOMBA: %d,%d\n", i, j);
-                        }
+                    if (celda_actual > 0)
+                    {
+                        TableroRival->valores[j][i] = -2;
+                        printf("IMPACTO BOMBA: %d,%d\n", i, j);
+                    }
+                    else if (celda_actual == 0)
+                    {
+                        TableroRival->valores[j][i] = -1;
+                        printf("FALLO BOMBA: %d,%d\n", i, j);
                     }
                 }
             }
-            printf("FIN BOMBA\n");
-            break;
         }
-        
-        case 2: { // Catalejo
-            printf("INICIO CATALEJO:%d,%d\n", CoorX, CoorY);
-            for (int j = CoorY - 1; j <= CoorY + 1; j++) {
-                for (int i = CoorX - 1; i <= CoorX + 1; i++) {
-                    if (i >= 0 && i < TableroRival->ancho && j >= 0 && j < TableroRival->alto) {
-                        int contenido = TableroRival->valores[j][i];
-                        if (contenido > 0) {
-                            printf("CELDA: %d,%d, BARCO ID: %d\n", i, j, contenido);
-                        } else if (contenido == 0) {
-                            printf("CELDA: %d,%d, AGUA\n", i, j);
-                        } else if (contenido == -1) {
-                            printf("CELDA: %d,%d, FALLO\n", i, j);
-                        } else if (contenido == -2) {
-                            printf("CELDA: %d,%d, GOLPE\n", i, j);
-                        }
+        printf("FIN BOMBA\n");
+        break;
+    }
+
+    case 2:
+    { // Catalejo
+        printf("INICIO CATALEJO:%d,%d\n", CoorX, CoorY);
+        for (int j = CoorY - 1; j <= CoorY + 1; j++)
+        {
+            for (int i = CoorX - 1; i <= CoorX + 1; i++)
+            {
+                if (i >= 0 && i < TableroRival->ancho && j >= 0 && j < TableroRival->alto)
+                {
+                    int contenido = TableroRival->valores[j][i];
+                    if (contenido > 0)
+                    {
+                        printf("CELDA: %d,%d, BARCO ID: %d\n", i, j, contenido);
+                    }
+                    else if (contenido == 0)
+                    {
+                        printf("CELDA: %d,%d, AGUA\n", i, j);
+                    }
+                    else if (contenido == -1)
+                    {
+                        printf("CELDA: %d,%d, FALLO\n", i, j);
+                    }
+                    else if (contenido == -2)
+                    {
+                        printf("CELDA: %d,%d, GOLPE\n", i, j);
                     }
                 }
             }
-            printf("FIN CATALEJO\n");
-            break;
         }
-        
-        case 3: { // Torpedo
-            printf("INICIO TORPEDO: %d,%d,%d\n", CoorX, CoorY, Orientacion);
-            // Codigo del torpedo xd
-            printf("FIN TORPEDO\n");
-            break;
-        }
-        
-        default:
-            printf("ERROR: ID de objeto incorrecta: %d\n", ID);
-            break;
+        printf("FIN CATALEJO\n");
+        break;
+    }
+
+    case 3:
+    { // Torpedo
+        printf("INICIO TORPEDO: %d,%d,%d\n", CoorX, CoorY, Orientacion);
+        // Codigo del torpedo xd
+        printf("FIN TORPEDO\n");
+        break;
+    }
+
+    default:
+        printf("ERROR: ID de objeto incorrecta: %d\n", ID);
+        break;
     }
 }
 
@@ -357,16 +423,25 @@ Partida *leerConfiguracion(const char *archivo)
         return NULL;
     }
 
-    Partida *partida = (Partida *) malloc(sizeof(Partida));
+    Partida *partida = (Partida *)malloc(sizeof(Partida));
     if (!partida)
     {
         printf("Error: No se pudo asignar memoria para la partida\n");
         fclose(file);
         return NULL;
     }
+    partida->historial = stack_create();
+    if (!partida->historial)
+    {
+        printf("Error: No se pudo crear la pila de historial\n");
+        fclose(file);
+        free(partida);
+        return NULL;
+    }
 
     // Leer ID del juego
-    if (fscanf(file, "%5s", partida->id) != 1) {
+    if (fscanf(file, "%5s", partida->id) != 1)
+    {
         printf("Error: No se pudo leer el ID de la partida\n");
         free(partida);
         fclose(file);
@@ -375,7 +450,8 @@ Partida *leerConfiguracion(const char *archivo)
 
     // Inicializar lista de jugadores
     partida->jugadores = list_create();
-    if (!partida->jugadores) {
+    if (!partida->jugadores)
+    {
         printf("Error: No se pudo crear la lista de jugadores\n");
         free(partida);
         fclose(file);
@@ -384,7 +460,8 @@ Partida *leerConfiguracion(const char *archivo)
 
     // Add this line to initialize mensajesEstado
     partida->mensajesEstado = list_create();
-    if (!partida->mensajesEstado) {
+    if (!partida->mensajesEstado)
+    {
         printf("Error: No se pudo crear la lista de mensajes de estado\n");
         list_clean(partida->jugadores);
         free(partida);
@@ -392,7 +469,7 @@ Partida *leerConfiguracion(const char *archivo)
         return NULL;
     }
 
-    Jugador *bot = (Jugador *) malloc(sizeof(Jugador));
+    Jugador *bot = (Jugador *)malloc(sizeof(Jugador));
     if (!bot)
     {
         printf("Error: No se pudo asignar memoria para el bot\n");
@@ -400,7 +477,7 @@ Partida *leerConfiguracion(const char *archivo)
         free(partida);
     }
 
-    Jugador *usuario = (Jugador *) malloc(sizeof(Jugador));
+    Jugador *usuario = (Jugador *)malloc(sizeof(Jugador));
     if (!usuario)
     {
         printf("Error: No se pudo asignar memoria para el jugador\n");
@@ -410,7 +487,7 @@ Partida *leerConfiguracion(const char *archivo)
         return NULL;
     }
 
-    Tablero *tablero_usuario = (Tablero *) malloc(sizeof(Tablero));
+    Tablero *tablero_usuario = (Tablero *)malloc(sizeof(Tablero));
     if (!tablero_usuario)
     {
         printf("Error: No se pudo asignar memoria para el tablero\n");
@@ -422,7 +499,8 @@ Partida *leerConfiguracion(const char *archivo)
 
     // Leer dimensiones de la cuadrícula
     int rows, cols;
-    if (fscanf(file, "%d %d", &rows, &cols) != 2 || rows <= 0 || cols <= 0 || rows > MAX_GRID || cols > MAX_GRID) {
+    if (fscanf(file, "%d %d", &rows, &cols) != 2 || rows <= 0 || cols <= 0 || rows > MAX_GRID || cols > MAX_GRID)
+    {
         printf("Error: Dimensiones de la cuadrícula inválidas\n");
         list_clean(partida->jugadores);
         free(partida);
@@ -435,8 +513,9 @@ Partida *leerConfiguracion(const char *archivo)
     tablero_usuario->alto = rows;
 
     // Asignar memoria para la cuadrícula
-    tablero_usuario->valores = (int **) malloc(rows * sizeof(int *));
-    if (!tablero_usuario->valores) {
+    tablero_usuario->valores = (int **)malloc(rows * sizeof(int *));
+    if (!tablero_usuario->valores)
+    {
         printf("Error: No se pudo asignar memoria para la cuadrícula\n");
         list_clean(partida->jugadores);
         free(tablero_usuario);
@@ -446,12 +525,15 @@ Partida *leerConfiguracion(const char *archivo)
         return NULL;
     }
 
-    for (int i = 0; i < rows; i++) {
-        tablero_usuario->valores[i] = (int *) malloc(cols * sizeof(int));
-        if (!tablero_usuario->valores[i]) {
+    for (int i = 0; i < rows; i++)
+    {
+        tablero_usuario->valores[i] = (int *)malloc(cols * sizeof(int));
+        if (!tablero_usuario->valores[i])
+        {
             printf("Error: No se pudo asignar memoria para la fila %d\n", i);
             // Liberar memoria previamente asignada
-            for (int j = 0; j < i; j++) {
+            for (int j = 0; j < i; j++)
+            {
                 free(tablero_usuario->valores[j]);
             }
             free(tablero_usuario->valores);
@@ -463,17 +545,20 @@ Partida *leerConfiguracion(const char *archivo)
             return NULL;
         }
         // Inicializar fila con ceros
-        for (int j = 0; j < cols; j++) {
+        for (int j = 0; j < cols; j++)
+        {
             tablero_usuario->valores[i][j] = 0;
         }
     }
 
     // Leer los valores de la cuadrícula del archivo
     int n_barcos = 0;
-    List *barcos_temp = list_create();  // Lista temporal para almacenar barcos mientras se leen
-    if (!barcos_temp) {
+    List *barcos_temp = list_create(); // Lista temporal para almacenar barcos mientras se leen
+    if (!barcos_temp)
+    {
         printf("Error: No se pudo crear la lista temporal de barcos\n");
-        for (int i = 0; i < rows; i++) {
+        for (int i = 0; i < rows; i++)
+        {
             free(tablero_usuario->valores[i]);
         }
         free(tablero_usuario->valores);
@@ -483,12 +568,16 @@ Partida *leerConfiguracion(const char *archivo)
         return NULL;
     }
 
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            if (fscanf(file, "%d", &tablero_usuario->valores[i][j]) != 1) {
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < cols; j++)
+        {
+            if (fscanf(file, "%d", &tablero_usuario->valores[i][j]) != 1)
+            {
                 printf("Error: No se pudo leer el valor en la posición [%d][%d]\n", i, j);
                 list_clean(barcos_temp);
-                for (int k = 0; k < rows; k++) {
+                for (int k = 0; k < rows; k++)
+                {
                     free(tablero_usuario->valores[k]);
                 }
                 free(tablero_usuario->valores);
@@ -498,12 +587,14 @@ Partida *leerConfiguracion(const char *archivo)
                 return NULL;
             }
 
-            Barco *barco = leerCelda(tablero_usuario->valores[i][j], i, j, rows, cols, 
-                                   tablero_usuario->valores, barcos_temp, &n_barcos);
-            if (!barco && tablero_usuario->valores[i][j] > 0) {
+            Barco *barco = leerCelda(tablero_usuario->valores[i][j], i, j, rows, cols,
+                                     tablero_usuario->valores, barcos_temp, &n_barcos);
+            if (!barco && tablero_usuario->valores[i][j] > 0)
+            {
                 // Error ocurrió en leerCelda
                 list_clean(barcos_temp);
-                for (int k = 0; k < rows; k++) {
+                for (int k = 0; k < rows; k++)
+                {
                     free(tablero_usuario->valores[k]);
                 }
                 free(tablero_usuario->valores);
@@ -517,10 +608,12 @@ Partida *leerConfiguracion(const char *archivo)
 
     // Transferir barcos de la lista temporal a la lista de barcos del tablero
     tablero_usuario->barcos = list_create();
-    if (!tablero_usuario->barcos) {
+    if (!tablero_usuario->barcos)
+    {
         printf("Error: No se pudo crear la lista de barcos del tablero\n");
         list_clean(barcos_temp);
-        for (int i = 0; i < rows; i++) {
+        for (int i = 0; i < rows; i++)
+        {
             free(tablero_usuario->valores[i]);
         }
         free(tablero_usuario->valores);
@@ -533,29 +626,35 @@ Partida *leerConfiguracion(const char *archivo)
     }
 
     // Mover barcos de la lista temporal a la lista del tablero
-    for (Barco *b = list_first(barcos_temp); b != NULL; b = list_next(barcos_temp)) {
+    for (Barco *b = list_first(barcos_temp); b != NULL; b = list_next(barcos_temp))
+    {
         list_pushBack(tablero_usuario->barcos, b);
     }
-    list_clean(barcos_temp);  // Solo destruir la lista, no los barcos
+    list_clean(barcos_temp); // Solo destruir la lista, no los barcos
 
     // Determinar orientación de los barcos después de que todos están almacenados
-    for (Barco *b = list_first(tablero_usuario->barcos); b != NULL; b = list_next(tablero_usuario->barcos)) {
+    for (Barco *b = list_first(tablero_usuario->barcos); b != NULL; b = list_next(tablero_usuario->barcos))
+    {
         // Verificar si hay una celda de barco a la derecha
-        if (b->x + 1 < cols && tablero_usuario->valores[b->y][b->x + 1] == b->id) {
-            b->orientacion = 0;  // Horizontal
+        if (b->x + 1 < cols && tablero_usuario->valores[b->y][b->x + 1] == b->id)
+        {
+            b->orientacion = 0; // Horizontal
         }
         // Verificar si hay una celda de barco abajo
-        else if (b->y + 1 < rows && tablero_usuario->valores[b->y + 1][b->x] == b->id) {
-            b->orientacion = 1;  // Vertical
+        else if (b->y + 1 < rows && tablero_usuario->valores[b->y + 1][b->x] == b->id)
+        {
+            b->orientacion = 1; // Vertical
         }
     }
 
     usuario->tablero = tablero_usuario;
     usuario->objetos = list_create();
-    if (!usuario->objetos) {
+    if (!usuario->objetos)
+    {
         printf("Error: No se pudo crear la lista de objetos\n");
         list_clean(tablero_usuario->barcos);
-        for (int i = 0; i < rows; i++) {
+        for (int i = 0; i < rows; i++)
+        {
             free(tablero_usuario->valores[i]);
         }
         free(tablero_usuario->valores);
@@ -569,15 +668,18 @@ Partida *leerConfiguracion(const char *archivo)
 
     char buffer[51];
     int actual = 0;
-    while (fgets(buffer, sizeof(buffer), file)) {
-        if (actual == 0) {
+    while (fgets(buffer, sizeof(buffer), file))
+    {
+        if (actual == 0)
+        {
             actual++;
             continue;
         }
 
         int id, cantidad;
-        if(sscanf(buffer, "%d %d", &id, &cantidad) == 2){
-            for(int i = 0; i < cantidad; i++)
+        if (sscanf(buffer, "%d %d", &id, &cantidad) == 2)
+        {
+            for (int i = 0; i < cantidad; i++)
             {
                 int *id_ptr = malloc(sizeof(int));
                 *id_ptr = id;
@@ -598,10 +700,12 @@ Partida *leerConfiguracion(const char *archivo)
     }
     bot->tablero = tablero_bot;
     bot->objetos = list_create();
-    if (!bot->objetos) {
+    if (!bot->objetos)
+    {
         printf("Error: No se pudo crear la lista de objetos\n");
         list_clean(tablero_bot->barcos);
-        for (int i = 0; i < tablero_bot->alto; i++) {
+        for (int i = 0; i < tablero_bot->alto; i++)
+        {
             free(tablero_bot->valores[i]);
         }
         free(tablero_bot->valores);
@@ -630,23 +734,75 @@ int mostrarAyuda()
     return 0;
 }
 
-void mostrarMensajesEstado(Partida *partida){
+void mostrarMensajesEstado(Partida *partida)
+{
 
     int n_mensajes = list_size(partida->mensajesEstado);
     printf("8 %d\n", n_mensajes);
 
     char *mensaje;
-    while ( (mensaje = list_popFront(partida->mensajesEstado)) != NULL)
+    while ((mensaje = list_popFront(partida->mensajesEstado)) != NULL)
         printf("%s\n", mensaje);
 
-    fflush(stdout); 
+    fflush(stdout);
 }
 
-void leerAtaque(Partida *partida, char *buffer){
+void cargarHistorial(Partida *partida)
+{
+    if (!partida || !partida->id || !partida->historial)
+        return;
+
+    char path[256];
+    snprintf(path, sizeof(path), "cache/%s", partida->id);
+
+    FILE *f = fopen(path, "r");
+    if (!f)
+        return;
+
+    char linea[256];
+    while (fgets(linea, sizeof(linea), f))
+    {
+        char prefix[4];
+        int tipo, x, y;
+
+        if (sscanf(linea, "%3s %d %d %d", prefix, &tipo, &x, &y) == 4)
+        {
+            if (strcmp(prefix, "MOV") == 0)
+            {
+                Movimiento *mov = malloc(sizeof(Movimiento));
+                if (!mov)
+                    break;
+
+                mov->TypeMov = tipo;
+                mov->CoorX = x;
+                mov->CoorY = y;
+
+                stack_push(partida->historial, mov);
+            }
+        }
+    }
+    fclose(f);
+}
+
+void registrarMovimientoArchivo(const char *rutaArchivo, Movimiento *mov)
+{
+    FILE *file = fopen(rutaArchivo, "a");
+    if (!file)
+    {
+        printf("Error: No se pudo abrir el archivo para registrar movimiento\n");
+        return;
+    }
+    fprintf(file, "MOV %d %d %d\n", mov->TypeMov, mov->CoorX, mov->CoorY);
+    fclose(file);
+}
+
+void leerAtaque(Partida *partida, char *buffer)
+{
     int codigo;
     int x, y;
 
-    if (sscanf(buffer, "%d %d %d", &codigo, &x, &y) != 3) {
+    if (sscanf(buffer, "%d %d %d", &codigo, &x, &y) != 3)
+    {
         puts("Error: No se ingresaron dos coordenadas correctas");
         exit(1);
     }
@@ -660,7 +816,8 @@ void leerAtaque(Partida *partida, char *buffer){
     char *mensaje = malloc(sizeof(char) * 256);
 
     int valor;
-    if (x >= 0 && x < ancho && y >= 0 && y < alto){
+    if (x >= 0 && x < ancho && y >= 0 && y < alto)
+    {
         valor = bot->tablero->valores[y][x];
         if (valor > 0) // Impacto a un barco
             valor = -valor;
@@ -668,11 +825,14 @@ void leerAtaque(Partida *partida, char *buffer){
         else if (valor == 0)
             valor = 99; // Impacto al agua
 
-        else {
+        else
+        {
             puts("Error: La coordenada ingresada no es válida :()\n");
             exit(1);
         }
-    } else {
+    }
+    else
+    {
         puts("Coordenada fuera de rango :(\n");
         exit(1);
     }
@@ -683,13 +843,15 @@ void leerAtaque(Partida *partida, char *buffer){
     list_pushBack(partida->mensajesEstado, mensaje);
 }
 
-void leerObjeto(Partida *partida, char *buffer){
+void leerObjeto(Partida *partida, char *buffer)
+{
 
     int codigo;
     int id_objeto, x, y, orientacion;
 
-    if (sscanf(buffer, "%d %d %d %d", &codigo, &id_objeto, &x, &y, &orientacion) != 5) {
-        puts("Error: No se ingresaron cuatro opciones corr  ectas");
+    if (sscanf(buffer, "%d %d %d %d %d", &codigo, &id_objeto, &x, &y, &orientacion) != 5)
+    {
+        puts("Error: No se ingresaron cuatro opciones correctas");
         exit(1);
     }
 
@@ -699,32 +861,71 @@ void leerObjeto(Partida *partida, char *buffer){
     usarObjeto(id_objeto, x, y, bot->tablero, orientacion);
 }
 
-void leerAccion(Partida *partida, char *buffer){
-
+void leerAccion(Partida *partida, char *buffer)
+{
     int tipo_accion;
 
-    if (sscanf(buffer, "%d", &tipo_accion) != 1) {
+    if (sscanf(buffer, "%d", &tipo_accion) != 1)
+    {
         puts("Error: No se ingresó un tipo de acción válido");
         return;
     }
 
     if (tipo_accion == 4)
+    {
+        int x, y;
+        sscanf(buffer, "%*d %d %d", &x, &y);
         leerAtaque(partida, buffer);
-    
+
+        Movimiento *mov = malloc(sizeof(Movimiento));
+        if (!mov)
+            return;
+
+        mov->CoorX = x;
+        mov->CoorY = y;
+        mov->TypeMov = 4;
+
+        stack_push(partida->historial, mov);
+
+        char path[256];
+        snprintf(path, sizeof(path), "cache/%s", partida->id);
+        registrarMovimientoArchivo(path, mov);
+    }
     else if (tipo_accion == 5)
+    {
+        int id_obj, x, y, orient;
+        sscanf(buffer, "%*d %d %d %d %d", &id_obj, &x, &y, &orient);
+
         leerObjeto(partida, buffer);
-    
-    else {
+
+        Movimiento *mov = malloc(sizeof(Movimiento));
+        if (!mov)
+            return;
+
+        mov->CoorX = x;
+        mov->CoorY = y;
+        mov->TypeMov = 5;
+
+        stack_push(partida->historial, mov);
+
+        char path[256];
+        snprintf(path, sizeof(path), "cache/%s", partida->id);
+        registrarMovimientoArchivo(path, mov);
+    }
+    else
+    {
         puts("Error: No se ingresó un tipo de acción válido");
         mostrarAyuda();
         exit(1);
     }
 }
 
-void leerTurno(Partida *partida, char *eleccion){
+void leerTurno(Partida *partida, char *eleccion)
+{
 
     int codigo, n_acciones;
-    if (sscanf(eleccion, "%d %d", &codigo, &n_acciones) != 2) {
+    if (sscanf(eleccion, "%d %d", &codigo, &n_acciones) != 2)
+    {
         puts("Error: La elección no es correcta");
         exit(1);
         return;
@@ -740,7 +941,6 @@ void leerTurno(Partida *partida, char *eleccion){
     }
 
     mostrarMensajesEstado(partida);
-
 }
 
 int iniciarJuego(const char *archivo)
@@ -754,12 +954,12 @@ int iniciarJuego(const char *archivo)
         printf("Error: No se pudo cargar la configuración del juego\n");
         return 1;
     }
-
+    cargarHistorial(partida);
     printf("PARDTIDA INICIADA ID %s\n", partida->id);
     fflush(stdout);
 
     char buffer[256];
-    while(fgets(buffer, sizeof(buffer), stdin))
+    while (fgets(buffer, sizeof(buffer), stdin))
     {
         leerTurno(partida, buffer);
         fflush(stdout);
@@ -792,13 +992,48 @@ int main(int n_args, char *args[])
     // main.exe listaHistorial
     if (strcmp(args[1], "listaHistorial") == 0)
     {
+
         return 1;
     }
 
     // main.exe buscarPartida <id_partida>
     if (strcmp(args[1], "buscarPartida") == 0)
     {
-        return 1;
+        if (n_args != 3)
+        {
+            printf("Uso: listaHistorial <id_archivo>\n");
+            return 1;
+        }
+
+        char path[256];
+        snprintf(path, sizeof(path), "cache/%s", args[2]);
+
+        FILE *file = fopen(path, "r");
+        if (!file)
+        {
+            printf("Error: No se pudo abrir el archivo %s\n", path);
+            return 1;
+        }
+
+        printf("Historial de acciones:\n");
+
+        char linea[128];
+        while (fgets(linea, sizeof(linea), file))
+        {
+            if (strncmp(linea, "MOV", 3) == 0)
+            {
+                int tipo, x, y;
+                if (sscanf(linea, "MOV %d %d %d", &tipo, &x, &y) == 3)
+                {
+                    const char *tipoTexto = (tipo == 4) ? "Ataque" : (tipo == 5) ? "Uso de Objeto"
+                                                                                 : "Desconocido";
+                    printf("- %s en (%d, %d)\n", tipoTexto, x, y);
+                }
+            }
+        }
+
+        fclose(file);
+        return 0;
     }
 
     // main.exe ayuda
