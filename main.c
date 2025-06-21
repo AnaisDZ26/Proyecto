@@ -973,7 +973,6 @@ void leerTurno(Partida *partida, char *eleccion)
         leerAccion(partida, buffer);
     }
 
-    mostrarMensajesEstado(partida);
 }
 
 bool verificarFinalizacion(Partida* partida) {
@@ -981,22 +980,30 @@ bool verificarFinalizacion(Partida* partida) {
     if (current == NULL) {
         return true;
     }
+    
+    // Check both players
     do {
-        bool swap = false;
+        bool hasIntactShips = false;
         for (int i = 0; i < current->tablero->alto; i++) {
             for (int j = 0; j < current->tablero->ancho; j++) {
+                // Check for intact ships (positive values that are not 99)
                 if (current->tablero->valores[i][j] > 0 && current->tablero->valores[i][j] != 99) {
-                    swap = true;
+                    hasIntactShips = true;
                     break;
                 }
             }
-            if (swap) break;
+            if (hasIntactShips) break;
         }
-        if (!swap) {
+        
+        // If this player has no intact ships, game is over
+        if (!hasIntactShips) {
             return true;
         }
+        
         current = list_next(partida->jugadores);
     } while (current != NULL);
+    
+    // Both players still have intact ships
     return false;
 }
 
@@ -1023,14 +1030,18 @@ int iniciarJuego(const char *archivo)
         {
             buffer[len-1] = '\0';
         }
-        if(!verificarFinalizacion(partida))
+        
+        leerTurno(partida, buffer);
+        
+        // Check if game is finished after processing the turn
+        if(verificarFinalizacion(partida))
         {
             char *mensaje = malloc(sizeof(char) * 256);
             sprintf(mensaje, "777");
             list_pushBack(partida->mensajesEstado, mensaje);
         }
-
-        leerTurno(partida, buffer);
+        
+        mostrarMensajesEstado(partida);
         fflush(stdout);
     }
 

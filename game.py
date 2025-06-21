@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import random
+import math
 
 WIDTH = 1280
 HEIGHT = 720
@@ -16,6 +17,7 @@ class Grid:
 
     cell_color = (10, 70, 135)
     hover_color = (10, 100, 180)
+    handle_click = lambda s,x,y: None
 
     def __init__(self, scene, size, width, height, boats=[]):
         self.scene = scene
@@ -570,6 +572,8 @@ class HistoryScene(Scene):
 class MatchScene(Scene):
     def setup(self, grid, objects):
         self.init_match(grid, objects)
+
+        self.game.event_manager.add_action_key("end_turn", pg.K_RETURN)
 
     def handle_click(self, pos):
         # Verificar si el clic está en el panel de objetos
@@ -1277,6 +1281,126 @@ class UIManager:
             # Draw the button surface onto the screen
             screen.blit(btn_surf, btn["rect"])
 
+class AnimatedWaveBackground:
+    def __init__(self, wave_image, screen_width, screen_height, num_waves=16):
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.wave_image = wave_image
+        self.num_waves = num_waves
+        self.frame_counter = 0
+        
+        self.wave_layers = []
+        
+        base_wave_height = int(screen_height * 0.25)
+        overlap_factor = 0.3 # From user's edit
+        
+        for i in range(num_waves):
+            # Respect user's edit for wave height
+            aspect_ratio = self.wave_image.get_width() / self.wave_image.get_height()
+            scaled_height = base_wave_height * 2 
+            scaled_width = int(scaled_height * aspect_ratio)
+
+            scaled_wave = pg.transform.smoothscale(self.wave_image, (scaled_width, scaled_height))
+            
+            wave_surface = scaled_wave.copy()
+
+            # Create a brightness factor (0.0 = black, 1.0 = original color)
+            brightness = 1.0 - (i / (num_waves - 1) * 0.7)
+
+            # Create a color to multiply the wave image with
+            tint_value = int(255 * brightness)
+            tint_color = (tint_value, tint_value, tint_value)
+
+            # Apply the darkening effect by multiplying the wave's colors
+            wave_surface.fill(tint_color, None, pg.BLEND_RGB_MULT)
+            
+            # Position waves to overlap
+            y_overlap = scaled_height * overlap_factor
+            y_pos = (screen_height - scaled_height) - (i * y_overlap) + (num_waves/2 * y_overlap)
+
+            # Define movement properties for each wave
+            direction = 1 if i % 2 == 0 else -1
+            speed = 0.2 + (i * 0.01)
+            frequency = 0.01 + (i * 0.007)
+            amplitude = 10 + (i * 0.5)
+
+            if i % 3 == 0:
+                speed *= 1.4
+                frequency *= 1.1
+
+            self.wave_layers.append({
+                'surface': wave_surface,
+                'y_pos_base': y_pos,
+                'x_offset': random.randint(0, screen_width),
+                'direction': direction,
+                'speed': speed,
+                'frequency': frequency,
+                'amplitude': amplitude
+            })
+    
+    def update(self):
+        self.frame_counter += 1
+        for wave in self.wave_layers:
+            wave['x_offset'] += wave['direction'] * wave['speed']
+            
+            if abs(wave['x_offset']) > wave['surface'].get_width():
+                wave['x_offset'] = 0
+
+    def draw(self, screen):
+        for wave in sorted(self.wave_layers, key=lambda w: w['y_pos_base']):
+            sin_offset = math.sin(self.frame_counter * wave['frequency']) * wave['amplitude']
+            x_pos = wave['x_offset']
+            y_pos = wave['y_pos_base'] + sin_offset
+            
+            wave_width = wave['surface'].get_width()
+            
+            # Calculate how many wave instances we need to cover the entire screen
+            # We need to cover from -wave_width to screen_width + wave_width to ensure no gaps
+            start_x = -wave_width
+            end_x = self.screen_width + wave_width
+            
+            # Calculate the first wave position that covers the left edge
+            first_wave_x = x_pos
+            while first_wave_x > start_x:
+                first_wave_x -= wave_width
+            
+            # Draw waves from left to right to ensure complete coverage
+            current_x = first_wave_x
+            while current_x < end_x:
+                screen.blit(wave['surface'], (current_x, y_pos))
+                current_x += wave_width
+
+class AssetManager:
+    def load(self):
+        self.audio = {
+            "music": {
+                "main": "assets/audio/menu.mp3",
+            },
+            "sfx": {
+                "hover": pg.mixer.Sound("assets/audio/hover.wav"),
+                "create": pg.mixer.Sound("assets/audio/create.wav"),
+                "deny": pg.mixer.Sound("assets/audio/deny.wav"),
+                "destroy": pg.mixer.Sound("assets/audio/destroy.wav"),
+            }
+        }
+        for audio in self.audio["sfx"].values():
+            audio.set_volume(0.1)
+
+        self.images = {
+            "menu": pg.image.load("assets/img/menu.png").convert_alpha(),
+            "bomb": pg.image.load("assets/img/bomb.png").convert_alpha(),
+            "spyglass": pg.image.load("assets/img/spyglass.png").convert_alpha(),
+            "torpedo": pg.image.load("assets/img/torpedo.png").convert_alpha(),
+            "target": pg.image.load("assets/img/target.png").convert_alpha(),
+            "broken": pg.image.load("assets/img/broken.png").convert_alpha(),
+            "dice": pg.image.load("assets/img/dice.png").convert_alpha(),
+            "clear": pg.image.load("assets/img/clear.png").convert_alpha(),
+            "title": pg.image.load("assets/img/tittle.png").convert_alpha(),
+            "wave": pg.image.load("assets/img/wave.png").convert_alpha(),
+        }
+
+        # Create animated wave background with more waves
+        self.background = AnimatedWaveBackground(self.images["wave"], WIDTH, HEIGHT, num_waves=12)
 
 class Game:
     def __init__(self, win_size):
@@ -1313,7 +1437,10 @@ class Game:
 
     def update(self, screen):
         self.event_manager.update()
+        
         screen.fill((12, 139, 221))
+        self.assets.background.update()
+        self.assets.background.draw(screen)
 
         self.current_scene.update(screen)
         if self.current_scene.ui:
@@ -1378,39 +1505,6 @@ class AnimatedSprite:
         x = col * self.size[0]         # Calculate x position
         y = row * self.size[1]         # Calculate y position
         return self.img.subsurface(x, y, self.size[0], self.size[1])
-
-
-class AssetManager:
-    def load(self):
-        self.audio = {
-            "music": {
-                "main": "assets/audio/menu.mp3",
-            },
-            "sfx": {
-                "hover": pg.mixer.Sound("assets/audio/hover.wav"),
-                "create": pg.mixer.Sound("assets/audio/create.wav"),
-                "deny": pg.mixer.Sound("assets/audio/deny.wav"),
-                "destroy": pg.mixer.Sound("assets/audio/destroy.wav"),
-            }
-        }
-        for audio in self.audio["sfx"].values():
-            audio.set_volume(0.1)
-
-        self.images = {
-            "menu": pg.image.load("assets/img/menu.png").convert_alpha(),
-            "bomb": pg.image.load("assets/img/bomb.png").convert_alpha(),
-            "spyglass": pg.image.load("assets/img/spyglass.png").convert_alpha(),
-            "torpedo": pg.image.load("assets/img/torpedo.png").convert_alpha(),
-            "target": pg.image.load("assets/img/target.png").convert_alpha(),
-            "broken": pg.image.load("assets/img/broken.png").convert_alpha(),
-            "dice": pg.image.load("assets/img/dice.png").convert_alpha(),
-            "clear": pg.image.load("assets/img/clear.png").convert_alpha(),
-            "title": pg.image.load("assets/img/tittle.png").convert_alpha(),
-        }
-
-        self.animations = {
-            "fog_cloud": AnimatedSprite("assets/anim/fog-cloud.png", (1280, 900), 37),
-        }
 
 class Engine:
 
