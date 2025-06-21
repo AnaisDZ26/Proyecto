@@ -34,20 +34,10 @@ class Grid:
         self.grid_height = (self.cell_size * self.size[1]) + (self.margin * (self.size[1] - 1))
         
     def draw_grid_frame(self, screen):
-        """Draw a rounded box frame around the grid with 50% opacity"""
-        # Create a surface with alpha channel for transparency
         frame_surface = pg.Surface((self.grid_width + 20, self.grid_height + 20), pg.SRCALPHA)
-        
-        # Black color with 50% opacity (50 alpha value)
         frame_color = (0, 0, 0, 80)
-        
-        # Frame dimensions - slightly larger than the grid
         frame_rect = pg.Rect(0, 0, self.grid_width + 20, self.grid_height + 20)
-        
-        # Draw the rounded rectangle frame
         pg.draw.rect(frame_surface, frame_color, frame_rect, border_radius=15)
-        
-        # Blit the frame surface onto the screen, positioned behind the grid
         screen.blit(frame_surface, (self.start_pos.x - 10, self.start_pos.y - 10))
     
     def draw_boat(self, screen, boat, is_preview=False):
@@ -74,15 +64,12 @@ class Grid:
         screen.blit(boat_surf, boat_rect)
     
     def draw_cell(self, screen, i, j):
-        rect = pg.Rect(i * (self.cell_size + self.margin), j * (self.cell_size + self.margin), self.cell_size, self.cell_size)
-
-        # Verificar si el mouse está sobre esta celda
+        w = self.cell_size + self.margin
+        s = self.cell_size
+        rect = pg.Rect(i * w, j * w, s, s)
         mouse_pos = pg.mouse.get_pos() - self.start_pos
         color = self.hover_color if rect.collidepoint(mouse_pos) else self.cell_color
-        
-        # Dibujar celda
         pg.draw.rect(screen, color, rect, border_radius=5)
-
         return rect
     
     def draw(self, surf):
@@ -174,6 +161,7 @@ class EnemyGrid(Grid):
 
         self.selected_target = None
         self.target_img = self.scene.game.assets.images["target"]
+
         target_size = int(self.cell_size * 0.8)
         dim = (target_size, target_size)
         self.target_img = pg.transform.smoothscale(self.target_img, dim)
@@ -182,9 +170,23 @@ class EnemyGrid(Grid):
         
         # Referencia al objeto seleccionado para mostrar marcador
         self.selected_object = None
+        # Orientación manual para torpedo (6: horizontal, 7: vertical)
+        self.torpedo_orientation = 6
 
     def set_selected_object(self, object_name):
         self.selected_object = object_name
+        # Resetear orientación cuando se selecciona un nuevo objeto
+        self.torpedo_orientation = 6
+
+    def rotate_torpedo(self):
+        """Rotar la orientación del torpedo entre horizontal y vertical"""
+        if self.selected_object == 'torpedo':
+            self.torpedo_orientation = 7 if self.torpedo_orientation == 6 else 6
+
+    def is_valid_torpedo_position(self, i, j):
+        """Verificar si la posición es válida para colocar un torpedo (en el borde)"""
+        border = (0, self.size[0] - 1)
+        return i in border or j in border
 
     def handle_click(self, pos):
         # Convertir posición del mouse a índices de celda de la cuadrícula
@@ -231,7 +233,6 @@ class EnemyGrid(Grid):
 
         # Dibujar objetos colocados
         self.draw_placed_objects(grid_surf)
-
         screen.blit(grid_surf, self.start_pos)
 
     def draw_placed_objects(self, grid_surf):
@@ -257,6 +258,33 @@ class EnemyGrid(Grid):
             obj_rect = scaled_obj.get_rect(center=rect.center)
             grid_surf.blit(scaled_obj, obj_rect)
 
+            if object_name == 'torpedo':
+                orientation = obj['orientation']
+                circle_radius = 3
+                circle_color = (255, 0, 0)
+                max_i = self.size[0] - 1
+                max_j = self.size[1] - 1
+                # Horizontal
+                if orientation == 6:
+                    if x == 0:  # left border, points right
+                        circle_x = rect.right - circle_radius - 2
+                        circle_y = rect.centery
+                        pg.draw.circle(grid_surf, circle_color, (circle_x, circle_y), circle_radius)
+                    elif x == max_i:  # right border, points left
+                        circle_x = rect.left + circle_radius + 2
+                        circle_y = rect.centery
+                        pg.draw.circle(grid_surf, circle_color, (circle_x, circle_y), circle_radius)
+                # Vertical
+                elif orientation == 7:
+                    if y == 0:  # top border, points down
+                        circle_x = rect.centerx
+                        circle_y = rect.bottom - circle_radius - 2
+                        pg.draw.circle(grid_surf, circle_color, (circle_x, circle_y), circle_radius)
+                    elif y == max_j:  # bottom border, points up
+                        circle_x = rect.centerx
+                        circle_y = rect.top + circle_radius + 2
+                        pg.draw.circle(grid_surf, circle_color, (circle_x, circle_y), circle_radius)
+
     def update_cell(self, x, y, value):
         self.state_grid[x][y] = value
 
@@ -273,6 +301,7 @@ class EnemyGrid(Grid):
             w = self.cell_size + self.margin
             s = self.cell_size
             rect = pg.Rect(i * w, j * w, s, s)
+
             # Centrar la imagen del objetivo en la celda
             img_rect = self.target_img.get_rect(center=rect.center)
             screen.blit(self.target_img, img_rect)
@@ -294,6 +323,36 @@ class EnemyGrid(Grid):
                 # Centrar la imagen del objeto en la celda
                 obj_rect = scaled_obj.get_rect(center=rect.center)
                 screen.blit(scaled_obj, obj_rect)
+
+                # Dibujar círculo de orientación para torpedo en preview
+                if self.selected_object == 'torpedo':
+                    # Solo mostrar orientación si la posición es válida para torpedo
+                    if self.is_valid_torpedo_position(i, j):
+                        circle_radius = 3
+                        circle_color = (255, 0, 0)
+
+                        max_i = self.size[0] - 1
+                        max_j = self.size[1] - 1
+                        
+                        if self.torpedo_orientation == 6:  # Horizontal
+                            if i == 0:  # left border, points right
+                                circle_x = rect.right - circle_radius - 2
+                                circle_y = rect.centery
+                                pg.draw.circle(screen, circle_color, (circle_x, circle_y), circle_radius)
+                            elif i == max_i:  # right border, points left
+                                circle_x = rect.left + circle_radius + 2
+                                circle_y = rect.centery
+                                pg.draw.circle(screen, circle_color, (circle_x, circle_y), circle_radius)
+                        # Vertical
+                        elif self.torpedo_orientation == 7:
+                            if j == 0:  # top border, points down
+                                circle_x = rect.centerx
+                                circle_y = rect.bottom - circle_radius - 2
+                                pg.draw.circle(screen, circle_color, (circle_x, circle_y), circle_radius)
+                            elif j == max_j:  # bottom border, points up
+                                circle_x = rect.centerx
+                                circle_y = rect.top + circle_radius + 2
+                                pg.draw.circle(screen, circle_color, (circle_x, circle_y), circle_radius)
 
 class ObjectPanel:
 
@@ -1041,7 +1100,7 @@ class MatchScene(Scene):
     def setup(self, grid, objects):
         self.init_match(grid, objects)
         self.game.event_manager.add_action_key(pg.K_SPACE, self.end_turn)
-
+        self.game.event_manager.add_action_key(pg.K_r, self.rotate_torpedo)
 
     def handle_click(self, pos):
         # Verificar si el clic está en el panel de objetos
@@ -1103,30 +1162,40 @@ class MatchScene(Scene):
                 s = self.gridA.cell_size
                 rect = pg.Rect(i * w, j * w, s, s)
                 if rect.collidepoint(mouse_vec):
-                    # Usar el objeto seleccionado en esta posición
-                    self.use_object_at_position(i, j)
+                    # Para torpedo, usar orientación manual solo si la posición es válida
+                    orientation = 0
+                    if self.selected_object == 'torpedo':
+                        if self.gridA.is_valid_torpedo_position(i, j):
+                            orientation = self.gridA.torpedo_orientation
+                        else:
+                            return  # No permitir colocar torpedo en posición inválida
+
+                    self.use_object_at_position(i, j, orientation)
                     return
 
-    def use_object_at_position(self, x, y):
+    def use_object_at_position(self, x, y, orientation=0):
         if not self.selected_object or self.object_panel.items[self.selected_object]['quantity'] <= 0:
             return
             
+        if self.selected_object == 'torpedo' and orientation == 0:
+            return
+
         # Decrementar cantidad
         self.object_panel.items[self.selected_object]['quantity'] -= 1
 
         # Agregar objeto usado a la lista del turno
-        self.used_objects.append({
+        new_object = {
             'object_id': self.object_panel.items[self.selected_object]['id'],
             'x': x,
             'y': y
-        })
+        }
+
+        if self.selected_object == 'torpedo':
+            new_object['orientation'] = orientation
         
+        self.used_objects.append(new_object)
         # Agregar objeto a la lista de objetos colocados para mostrar visualmente
-        self.placed_objects.append({
-            'object_name': self.selected_object,
-            'x': x,
-            'y': y
-        })
+        self.placed_objects.append({'object_name': self.selected_object, **new_object})
         
         # Limpiar selección
         self.selected_object = None
@@ -1258,6 +1327,7 @@ class MatchScene(Scene):
         if 'bomb' in self.object_panel.items:
             # Agregar 10 bombas
             self.object_panel.items['bomb']['quantity'] += 10
+            self.object_panel.items['torpedo']['quantity'] += 10
             
             # Reproducir sonido de éxito
             create_sound = self.game.assets.audio["sfx"]["create"]
@@ -1306,7 +1376,10 @@ class MatchScene(Scene):
             
             # Enviar mensajes de objetos usados
             for obj in self.used_objects:
-                msg += f"5 {obj['object_id']} {obj['x']} {obj['y']}\n"
+                if obj['object_id'] == 3:
+                    msg += f"5 {obj['object_id']} {obj['x']} {obj['y']} {obj['orientation']}\n"
+                else:
+                    msg += f"5 {obj['object_id']} {obj['x']} {obj['y']}\n"
             
             print(msg, end='')
             
@@ -1341,7 +1414,9 @@ class MatchScene(Scene):
                             x, y, value = map(int, message.split()[1:])
                             self.gridA.update_cell(x, y, value)
                         elif message_type == 777: # Código de victoria
+
                             # ¡Victoria! Cambiar a la escena de victoria
+                            self.proc.kill()
                             self.game.goto_scene("victory")
                             return
                         # Aquí puedes procesar cada mensaje según sea necesario
@@ -1392,6 +1467,11 @@ class MatchScene(Scene):
                         self.gridB.handle_click(i, j)
 
         self.ui.update(screen)
+
+    def rotate_torpedo(self):
+        """Rotar la orientación del torpedo"""
+        if hasattr(self, 'gridA'):
+            self.gridA.rotate_torpedo()
 
 class SetupScene(Scene):
     def setup(self):
@@ -1953,6 +2033,7 @@ class Game:
         if hasattr(self.current_scene, 'object_panel') and 'bomb' in self.current_scene.object_panel.items:
             # Agregar 10 bombas
             self.current_scene.object_panel.items['bomb']['quantity'] += 10
+            self.current_scene.object_panel.items['torpedo']['quantity'] += 10
             
             # Reproducir sonido de éxito
             create_sound = self.assets.audio["sfx"]["create"]

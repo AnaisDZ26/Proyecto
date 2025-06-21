@@ -48,6 +48,8 @@ typedef struct
     int TypeMov; // 4 - Ataque. 5 - Usar Objeto.
 } Movimiento;
 
+void aplicarAtaque(Partida *partida, int x, int y);
+
 // Función para imprimir un tablero
 void imprimirTablero(Tablero *tablero, int es_bot)
 {
@@ -328,18 +330,140 @@ Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List
     return barco;
 }
 
-void ObjectTorpedo(Partida *partida, Jugador *player, int CoorFija, int CoorVariable)
+void informarCasilla(Partida *partida, int x, int y)
 {
-    for (int i = CoorVariable; i < player->tablero->ancho; i++)
+    Jugador *usuario = list_first(partida->jugadores);
+    Jugador *bot = list_next(partida->jugadores);
+
+    int valor = bot->tablero->valores[y][x];
+
+    if (valor == 0)
     {
-        if (player->tablero->valores[i][CoorFija] == 0 || player->tablero->valores[i][CoorFija] == 99)
+        bot->tablero->valores[y][x] = 99;
+        valor = 99;
+    }
+
+    char *mensaje = malloc(sizeof(char) * 256);
+    sprintf(mensaje, "9 %d %d %d", x, y, valor); // Informe de estado de casilla
+    list_pushBack(partida->mensajesEstado, mensaje);
+}
+
+void aplicarAtaque(Partida *partida, int x, int y)
+{
+    Jugador *usuario = list_first(partida->jugadores);
+    Jugador *bot = list_next(partida->jugadores);
+
+    int ancho = bot->tablero->ancho;
+    int alto = bot->tablero->alto;
+
+    char *mensaje = malloc(sizeof(char) * 256);
+
+    int valor;
+    if (x >= 0 && x < ancho && y >= 0 && y < alto)
+    {
+        valor = bot->tablero->valores[y][x];
+
+        // Check if this cell has already been attacked
+        if (valor == 99 || valor < 0)
         {
-            player->tablero->valores[i][CoorFija] = 99;
+            // Cell already attacked, don't attack again
+            free(mensaje);
+            return;
+        }
+
+        if (valor > 0) // Impacto a un barco
+        {
+            valor = -valor; // Mark as hit
+        }
+        else if (valor == 0)
+        {
+            valor = 99; // Impacto al agua
         }
         else
         {
-            player->tablero->valores[i][CoorFija] = (player->tablero->valores[i][CoorFija]) * (-1);
+            puts("Error: La coordenada ingresada no es válida :()\n");
+            free(mensaje);
+            exit(1);
         }
+    }
+    else
+    {
+        puts("Coordenada fuera de rango :(\n");
+        free(mensaje);
+        exit(1);
+    }
+
+    bot->tablero->valores[y][x] = valor;
+    informarCasilla(partida, x, y);
+}
+
+void ObjectTorpedo(Partida *partida, Tablero *tablero, int CoorX, int CoorY, int Orientacion)
+{
+    // Validate initial coordinates
+    if (CoorX < 0 || CoorX >= tablero->ancho || CoorY < 0 || CoorY >= tablero->alto)
+    {
+        printf("Error: Coordenadas iniciales fuera de rango\n");
+        return;
+    }
+
+    // Determine direction based on orientation
+    // Orientacion 6: Horizontal (left to right)
+    // Orientacion 7: Vertical (top to bottom)
+    int dir_x = 0, dir_y = 0;
+    if (Orientacion == 6) // Horizontal
+    {
+        if (CoorX == 0)
+            dir_x = 1; // Move right
+        else
+            dir_x = -1; // Move left
+    }
+    else if (Orientacion == 7) // Vertical
+    {
+        if (CoorY == 0)
+            dir_y = 1; // Move down
+        else
+            dir_y = -1; // Move up
+    }
+    else
+    {
+        printf("Error: Orientación inválida para torpedo\n");
+        return;
+    }
+
+    int x = CoorX, y = CoorY;
+
+    // Check current position first
+    int current = tablero->valores[y][x];
+    if (current > 0 && current < 99)
+    {
+        aplicarAtaque(partida, x, y);
+        return; // Hit a ship, stop
+    }
+
+    informarCasilla(partida, x, y);
+
+    // Move in the specified direction until hitting a ship or reaching board boundary
+    while (1)
+    {
+        x += dir_x;
+        y += dir_y;
+
+        // Check if we're still within board boundaries
+        if (x < 0 || x >= tablero->ancho || y < 0 || y >= tablero->alto)
+        {
+            break; // Out of bounds, stop
+        }
+
+        current = tablero->valores[y][x];
+        
+        if (current > 0 && current < 99)
+        {
+            // Hit a ship
+            aplicarAtaque(partida, x, y);
+            break;
+        }
+
+        informarCasilla(partida, x, y);
     }
 }
 
@@ -399,15 +523,7 @@ void usarObjeto(Partida *partida, char *buffer)
             return;
         }
 
-        // Aplicar torpedo en la dirección especificada
-        if (Orientacion == 0) // Horizontal
-        {
-            ObjectTorpedo(partida, jugador, CoorY, CoorX);
-        }
-        else if (Orientacion == 1) // Vertical
-        {
-            ObjectTorpedo(partida, jugador, CoorX, CoorY);
-        }
+        ObjectTorpedo(partida, bot->tablero, CoorX, CoorY, Orientacion);
         break;
     }
 
@@ -818,73 +934,6 @@ void registrarMovimientoArchivo(const char *rutaArchivo, Movimiento *mov)
     }
     fprintf(file, "MOV %d %d %d\n", mov->TypeMov, mov->CoorX, mov->CoorY);
     fclose(file);
-}
-
-void informarCasilla(Partida *partida, int x, int y)
-{
-    Jugador *usuario = list_first(partida->jugadores);
-    Jugador *bot = list_next(partida->jugadores);
-
-    int valor = bot->tablero->valores[y][x];
-
-    if (valor == 0)
-    {
-        bot->tablero->valores[y][x] = 99;
-        valor = 99;
-    }
-
-    char *mensaje = malloc(sizeof(char) * 256);
-    sprintf(mensaje, "9 %d %d %d", x, y, valor); // Informe de estado de casilla
-    list_pushBack(partida->mensajesEstado, mensaje);
-}
-
-void aplicarAtaque(Partida *partida, int x, int y)
-{
-    Jugador *usuario = list_first(partida->jugadores);
-    Jugador *bot = list_next(partida->jugadores);
-
-    int ancho = bot->tablero->ancho;
-    int alto = bot->tablero->alto;
-
-    char *mensaje = malloc(sizeof(char) * 256);
-
-    int valor;
-    if (x >= 0 && x < ancho && y >= 0 && y < alto)
-    {
-        valor = bot->tablero->valores[y][x];
-
-        // Check if this cell has already been attacked
-        if (valor == 99 || valor < 0)
-        {
-            // Cell already attacked, don't attack again
-            free(mensaje);
-            return;
-        }
-
-        if (valor > 0) // Impacto a un barco
-        {
-            valor = -valor; // Mark as hit
-        }
-        else if (valor == 0)
-        {
-            valor = 99; // Impacto al agua
-        }
-        else
-        {
-            puts("Error: La coordenada ingresada no es válida :()\n");
-            free(mensaje);
-            exit(1);
-        }
-    }
-    else
-    {
-        puts("Coordenada fuera de rango :(\n");
-        free(mensaje);
-        exit(1);
-    }
-
-    bot->tablero->valores[y][x] = valor;
-    informarCasilla(partida, x, y);
 }
 
 void leerAccion(Partida *partida, char *buffer)
