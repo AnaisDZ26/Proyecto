@@ -328,6 +328,21 @@ Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List
     return barco;
 }
 
+void ObjectTorpedo(Partida *partida, Jugador *player, int CoorFija, int CoorVariable)
+{
+    for (int i = CoorVariable; i < player->tablero->ancho; i++)
+    {
+        if (player->tablero->valores[i][CoorFija] == 0 || player->tablero->valores[i][CoorFija] == 99)
+        {
+            player->tablero->valores[i][CoorFija] = 99;
+        }
+        else
+        {
+            player->tablero->valores[i][CoorFija] = (player->tablero->valores[i][CoorFija]) * (-1);
+        }
+    }
+}
+
 void usarObjeto(Partida *partida, char *buffer)
 {
     int code, ID;
@@ -341,7 +356,7 @@ void usarObjeto(Partida *partida, char *buffer)
     case 1:
     { // Bomba
 
-        int CoorX, CoorY, Orientacion;
+        int CoorX, CoorY;
         if (sscanf(buffer, "%*d %*d %d %d", &CoorX, &CoorY) != 2)
         {
             puts("Error: No se ingresaron parámetros válidos para el objeto");
@@ -371,7 +386,7 @@ void usarObjeto(Partida *partida, char *buffer)
         }
 
         informarCasilla(partida, CoorX, CoorY);
-        
+
         break;
     }
 
@@ -383,21 +398,15 @@ void usarObjeto(Partida *partida, char *buffer)
             puts("Error: No se ingresaron parámetros válidos para el objeto");
             return;
         }
-        
+
         // Aplicar torpedo en la dirección especificada
         if (Orientacion == 0) // Horizontal
         {
-            for (int i = CoorX; i < bot->tablero->ancho; i++)
-            {
-                aplicarAtaque(partida, i, CoorY);
-            }
+            ObjectTorpedo(partida, jugador, CoorY, CoorX);
         }
         else if (Orientacion == 1) // Vertical
         {
-            for (int j = CoorY; j < bot->tablero->alto; j++)
-            {
-                aplicarAtaque(partida, CoorX, j);
-            }
+            ObjectTorpedo(partida, jugador, CoorX, CoorY);
         }
         break;
     }
@@ -772,11 +781,11 @@ void cargarHistorial(Partida *partida)
     {
         // Remove newline character if present
         size_t len = strlen(linea);
-        if (len > 0 && linea[len-1] == '\n')
+        if (len > 0 && linea[len - 1] == '\n')
         {
-            linea[len-1] = '\0';
+            linea[len - 1] = '\0';
         }
-        
+
         char prefix[4];
         int tipo, x, y;
 
@@ -843,7 +852,7 @@ void aplicarAtaque(Partida *partida, int x, int y)
     if (x >= 0 && x < ancho && y >= 0 && y < alto)
     {
         valor = bot->tablero->valores[y][x];
-        
+
         // Check if this cell has already been attacked
         if (valor == 99 || valor < 0)
         {
@@ -851,7 +860,7 @@ void aplicarAtaque(Partida *partida, int x, int y)
             free(mensaje);
             return;
         }
-        
+
         if (valor > 0) // Impacto a un barco
         {
             valor = -valor; // Mark as hit
@@ -876,7 +885,6 @@ void aplicarAtaque(Partida *partida, int x, int y)
 
     bot->tablero->valores[y][x] = valor;
     informarCasilla(partida, x, y);
-
 }
 
 void leerAccion(Partida *partida, char *buffer)
@@ -897,7 +905,7 @@ void leerAccion(Partida *partida, char *buffer)
             puts("Error: No se ingresaron coordenadas válidas para el ataque");
             return;
         }
-        
+
         aplicarAtaque(partida, x, y);
 
         Movimiento *mov = malloc(sizeof(Movimiento));
@@ -919,7 +927,7 @@ void leerAccion(Partida *partida, char *buffer)
 
         usarObjeto(partida, buffer);
 
-        /* 
+        /*
         Movimiento *mov = malloc(sizeof(Movimiento));
         if (!mov)
             return;
@@ -962,47 +970,54 @@ void leerTurno(Partida *partida, char *eleccion)
             puts("Error: No se pudo leer la entrada");
             return;
         }
-        
+
         // Remove newline character if present
         size_t len = strlen(buffer);
-        if (len > 0 && buffer[len-1] == '\n')
+        if (len > 0 && buffer[len - 1] == '\n')
         {
-            buffer[len-1] = '\0';
+            buffer[len - 1] = '\0';
         }
-        
+
         leerAccion(partida, buffer);
     }
-
 }
 
-bool verificarFinalizacion(Partida* partida) {
+bool verificarFinalizacion(Partida *partida)
+{
     Jugador *current = list_first(partida->jugadores);
-    if (current == NULL) {
+    if (current == NULL)
+    {
         return true;
     }
-    
+
     // Check both players
-    do {
+    do
+    {
         bool hasIntactShips = false;
-        for (int i = 0; i < current->tablero->alto; i++) {
-            for (int j = 0; j < current->tablero->ancho; j++) {
+        for (int i = 0; i < current->tablero->alto; i++)
+        {
+            for (int j = 0; j < current->tablero->ancho; j++)
+            {
                 // Check for intact ships (positive values that are not 99)
-                if (current->tablero->valores[i][j] > 0 && current->tablero->valores[i][j] != 99) {
+                if (current->tablero->valores[i][j] > 0 && current->tablero->valores[i][j] != 99)
+                {
                     hasIntactShips = true;
                     break;
                 }
             }
-            if (hasIntactShips) break;
+            if (hasIntactShips)
+                break;
         }
-        
+
         // If this player has no intact ships, game is over
-        if (!hasIntactShips) {
+        if (!hasIntactShips)
+        {
             return true;
         }
-        
+
         current = list_next(partida->jugadores);
     } while (current != NULL);
-    
+
     // Both players still have intact ships
     return false;
 }
@@ -1026,21 +1041,21 @@ int iniciarJuego(const char *archivo)
     while (fgets(buffer, sizeof(buffer), stdin))
     {
         size_t len = strlen(buffer);
-        if (len > 0 && buffer[len-1] == '\n')
+        if (len > 0 && buffer[len - 1] == '\n')
         {
-            buffer[len-1] = '\0';
+            buffer[len - 1] = '\0';
         }
-        
+
         leerTurno(partida, buffer);
-        
+
         // Check if game is finished after processing the turn
-        if(verificarFinalizacion(partida))
+        if (verificarFinalizacion(partida))
         {
             char *mensaje = malloc(sizeof(char) * 256);
             sprintf(mensaje, "777");
             list_pushBack(partida->mensajesEstado, mensaje);
         }
-        
+
         mostrarMensajesEstado(partida);
         fflush(stdout);
     }
@@ -1073,12 +1088,6 @@ int main(int n_args, char *args[])
     if (strcmp(args[1], "listaHistorial") == 0)
     {
 
-        return 1;
-    }
-
-    // main.exe buscarPartida <id_partida>
-    if (strcmp(args[1], "buscarPartida") == 0)
-    {
         if (n_args != 3)
         {
             printf("Uso: listaHistorial <id_archivo>\n");
@@ -1102,11 +1111,11 @@ int main(int n_args, char *args[])
         {
             // Remove newline character if present
             size_t len = strlen(linea);
-            if (len > 0 && linea[len-1] == '\n')
+            if (len > 0 && linea[len - 1] == '\n')
             {
-                linea[len-1] = '\0';
+                linea[len - 1] = '\0';
             }
-            
+
             if (strncmp(linea, "MOV", 3) == 0)
             {
                 int tipo, x, y;
@@ -1121,6 +1130,12 @@ int main(int n_args, char *args[])
 
         fclose(file);
         return 0;
+    }
+
+    // main.exe buscarPartida <id_partida>
+    if (strcmp(args[1], "buscarPartida") == 0)
+    {
+        return 1;
     }
 
     // main.exe ayuda
