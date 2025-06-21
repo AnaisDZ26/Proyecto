@@ -328,6 +328,20 @@ Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List
     return barco;
 }
 
+void ObjectTorpedo(Partida * partida, Jugador *player, int CoorFija, int CoorVariable){
+    for (int i = CoorVariable; i < player->tablero->ancho; i++)
+    {
+        if(player->tablero->valores[i][CoorFija] == 0 || player->tablero->valores[i][CoorFija] == 99)
+        {
+            player->tablero->valores[i][CoorFija] = 99;
+        }
+        else
+        {
+            player->tablero->valores[i][CoorFija] = (player->tablero->valores[i][CoorFija]) * (-1);
+        }
+    }
+}
+
 void usarObjeto(Partida *partida, char *buffer)
 {
     int code, ID;
@@ -341,7 +355,7 @@ void usarObjeto(Partida *partida, char *buffer)
     case 1:
     { // Bomba
 
-        int CoorX, CoorY, Orientacion;
+        int CoorX, CoorY;
         if (sscanf(buffer, "%*d %*d %d %d", &CoorX, &CoorY) != 2)
         {
             puts("Error: No se ingresaron parámetros válidos para el objeto");
@@ -387,17 +401,11 @@ void usarObjeto(Partida *partida, char *buffer)
         // Aplicar torpedo en la dirección especificada
         if (Orientacion == 0) // Horizontal
         {
-            for (int i = CoorX; i < bot->tablero->ancho; i++)
-            {
-                aplicarAtaque(partida, i, CoorY);
-            }
+            ObjectTorpedo(partida, jugador, CoorY, CoorX);
         }
         else if (Orientacion == 1) // Vertical
         {
-            for (int j = CoorY; j < bot->tablero->alto; j++)
-            {
-                aplicarAtaque(partida, CoorX, j);
-            }
+            ObjectTorpedo(partida, jugador, CoorX, CoorY);
         }
         break;
     }
