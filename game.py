@@ -545,34 +545,12 @@ class MenuScene(Scene):
         """Override to not draw frame in menu scene"""
         pass
 
-class IntroScene(Scene):
-    def setup(self):
-        self.ui = UIManager(self.game)
-        
-        # Botón para continuar al setup
-        action_continue = lambda: self.game.goto_scene("setup")
-        self.ui.add_button("continue", (150, 50), action_continue, "Continuar", topleft=(WIDTH-180, HEIGHT-80))
-        
-        # Botón para volver al menú
-        action_back = lambda: self.game.goto_scene("menu")
-        self.ui.add_button("back", (120, 50), action_back, "Volver", topleft=(60, HEIGHT-80))
-        
-        # Texto del intro con párrafos
-        self.paragraphs = [
-            "Mientras el grupo 'Ensalada César' se encontraba sumergido en el caos del proyecto final de Estructura de Datos, un evento inesperado sacudió su realidad: sus computadores cobraron vida y los abdujeron sin previo aviso.",
-            "",
-            "Al abrir los ojos, se vieron atrapados en un universo alternativo lleno de lógica distorsionada, algoritmos flotantes... y mares infinitos.",
-            "",
-            "Ahora, en este mundo donde la programación y la fantasía chocan, deberán enfrentar a un enemigo legendario: Arturo Prat y su temido escuadrón de marines, comandando una flota de buques invisibles.",
-            "",
-            "Solo tú, como jugador, puedes ayudarlos. Usa bombas, torpedos, catalejos y cañones para detectar y destruir los barcos enemigos ocultos en la niebla digital.",
-            "",
-            "Planea tu estrategia, apunta con precisión y lleva al equipo de Ensalada César a la victoria!",
-            "",
-            "Solo así podrán romper la maldición del código eterno y regresar a su realidad... antes de que sea demasiado tarde.",
-        ]
-        
-        # Variables para el efecto typewriter
+class TextScene(Scene):
+    """Base class for scenes with typewriter text effects"""
+    
+    def __init__(self, game):
+        super().__init__(game)
+        # Variables for the effect typewriter
         self.current_paragraph = 0
         self.current_char = 0
         self.typewriter_speed = 2  # Caracteres por frame
@@ -612,7 +590,7 @@ class IntroScene(Scene):
         
         return lines
 
-    def update_typewriter(self):
+    def update_typewriter(self, texts):
         """Actualizar el efecto typewriter"""
         if self.finished_typing:
             return
@@ -620,8 +598,8 @@ class IntroScene(Scene):
         self.frame_counter += 1
         
         if self.frame_counter % self.typewriter_speed == 0:
-            if self.current_paragraph < len(self.paragraphs):
-                paragraph = self.paragraphs[self.current_paragraph]
+            if self.current_paragraph < len(texts):
+                paragraph = texts[self.current_paragraph]
                 if paragraph == "":  # Línea vacía
                     self.current_paragraph += 1
                     self.current_char = 0
@@ -640,7 +618,7 @@ class IntroScene(Scene):
                 # Terminamos de escribir todo
                 self.finished_typing = True
 
-    def draw_text_box(self, screen):
+    def draw_text_box(self, screen, texts):
         """Dibujar el box de texto con el efecto typewriter"""
         # Dibujar fondo del box
         box_rect = pg.Rect(self.text_box_x, self.text_box_y, self.text_box_width, self.text_box_height)
@@ -653,8 +631,8 @@ class IntroScene(Scene):
         
         # Dibujar párrafos completos
         for i in range(self.current_paragraph):
-            if i < len(self.paragraphs):
-                paragraph = self.paragraphs[i]
+            if i < len(texts):
+                paragraph = texts[i]
                 if paragraph == "":  # Línea vacía
                     current_y += self.line_height // 2
                 else:
@@ -665,8 +643,8 @@ class IntroScene(Scene):
                         current_y += self.line_height
         
         # Dibujar párrafo actual con efecto typewriter
-        if self.current_paragraph < len(self.paragraphs):
-            paragraph = self.paragraphs[self.current_paragraph]
+        if self.current_paragraph < len(texts):
+            paragraph = texts[self.current_paragraph]
             if paragraph == "":  # Línea vacía
                 current_y += self.line_height // 2
             else:
@@ -694,18 +672,153 @@ class IntroScene(Scene):
         if not self.finished_typing:
             # Completar todo el texto inmediatamente
             self.finished_typing = True
-            self.current_paragraph = len(self.paragraphs)
+            self.current_paragraph = len(self.get_texts())
             self.current_char = 0
         return False
+
+    def get_texts(self):
+        """Override this method in subclasses to return the texts to display"""
+        return []
+
+class IntroScene(TextScene):
+
+    def setup(self):
+        self.start_frame = int(self.game.frame)
+        self.ui = UIManager(self.game)
+        
+        # Botón para continuar al setup
+        action_continue = lambda: self.game.goto_scene("setup")
+        self.ui.add_button("continue", (150, 50), action_continue, "Continuar", topleft=(WIDTH-180, HEIGHT-80))
+        
+        # Botón para volver al menú
+        action_back = lambda: self.game.goto_scene("menu")
+        self.ui.add_button("back", (120, 50), action_back, "Volver", topleft=(60, HEIGHT-80))
+        
+        # Variables para mostrar imágenes explicativas
+        self.current_image = None
+        self.image_alpha = 0  # Para efecto de fade in/out
+        
+        # Diccionario con imágenes y sus rangos de frames para mostrar
+        # Formato: "nombre_imagen": (frame_inicio, frame_fin)
+        # frame_fin = -1 significa que se muestra hasta el final de la escena
+        self.image_frames = {
+            "prat": (950, -1)  # Mostrar desde frame 120 hasta el final
+        }
+
+    def get_texts(self):
+        return [
+            "Mientras el grupo 'Ensalada César' se encontraba sumergido en el caos del proyecto final de Estructura de Datos, un evento inesperado sacudió su realidad: sus computadores cobraron vida y los abdujeron sin previo aviso.",
+            "",
+            "Al abrir los ojos, se vieron atrapados en un universo alternativo lleno de lógica distorsionada, algoritmos flotantes... y mares infinitos.",
+            "",
+            "Ahora, en este mundo donde la programación y la fantasía chocan, deberán enfrentar a un enemigo legendario: Arturo Prat y su temido escuadrón de marines, comandando una flota de buques invisibles.",
+            "",
+            "Solo tú, como jugador, puedes ayudarlos. Usa bombas, torpedos, catalejos y cañones para detectar y destruir los barcos enemigos ocultos en la niebla digital.",
+            "",
+            "Planea tu estrategia, apunta con precisión y lleva al equipo de Ensalada César a la victoria!",
+            "",
+            "Solo así podrán romper la maldición del código eterno y regresar a su realidad... antes de que sea demasiado tarde.",
+        ]
+
+    def update_image_display(self):
+        """Actualizar qué imagen mostrar basado en el frame actual"""
+        current_frame = self.game.frame - self.start_frame
+        
+        # Buscar qué imagen debe mostrarse en el frame actual
+        image_to_show = None
+        for image_name, (start_frame, end_frame) in self.image_frames.items():
+            if current_frame >= start_frame:
+                if end_frame == -1 or current_frame <= end_frame:
+                    image_to_show = image_name
+                    break
+        
+        # Actualizar imagen actual
+        if image_to_show != self.current_image:
+            if image_to_show:
+                self.current_image = image_to_show
+                self.image_alpha = 0  # Iniciar fade in
+            else:
+                self.current_image = None
+                self.image_alpha = 0  # Iniciar fade out
+
+    def update_image_alpha(self):
+        """Actualizar transparencia de la imagen para efectos de fade"""
+        if self.current_image:
+            if self.image_alpha < 255:
+                self.image_alpha = min(255, self.image_alpha + 5)  # Fade in
+        else:
+            if self.image_alpha > 0:
+                self.image_alpha = max(0, self.image_alpha - 5)  # Fade out
+
+    def draw_explicative_image(self, screen):
+        """Dibujar imagen explicativa en una caja centrada arriba del texto"""
+        if not self.current_image or self.image_alpha <= 0:
+            return
+            
+        # Obtener la imagen
+        img = self.game.assets.images[self.current_image]
+        
+        # Calcular tamaño de la imagen (mantener proporción)
+        max_width = 300
+        max_height = 200
+        
+        # Calcular dimensiones manteniendo proporción
+        img_ratio = img.get_width() / img.get_height()
+        if img_ratio > max_width / max_height:
+            # Imagen más ancha que alta
+            display_width = max_width
+            display_height = int(max_width / img_ratio)
+        else:
+            # Imagen más alta que ancha
+            display_height = max_height
+            display_width = int(max_height * img_ratio)
+        
+        # Escalar imagen
+        scaled_img = pg.transform.smoothscale(img, (display_width, display_height))
+        
+        # Crear superficie con transparencia
+        img_surface = pg.Surface((display_width, display_height), pg.SRCALPHA)
+        img_surface.set_alpha(self.image_alpha)
+        img_surface.blit(scaled_img, (0, 0))
+        
+        # Calcular posición centrada horizontalmente
+        x = (WIDTH - display_width) // 2
+        y = self.text_box_y - display_height - 30  # 30 píxeles arriba del texto
+        
+        # Dibujar fondo de la caja
+        box_padding = 20
+        box_rect = pg.Rect(x - box_padding, y - box_padding, 
+                          display_width + box_padding * 2, 
+                          display_height + box_padding * 2)
+        
+        # Crear superficie para el fondo con transparencia
+        bg_surface = pg.Surface((box_rect.width, box_rect.height), pg.SRCALPHA)
+        bg_alpha = int(self.image_alpha * 0.8)  # Fondo ligeramente más transparente
+        bg_surface.fill((10, 70, 135, bg_alpha))
+        
+        # Dibujar el fondo
+        # screen.blit(bg_surface, box_rect)
+        
+        # Dibujar la imagen
+        screen.blit(img_surface, (x, y))
 
     def update(self, screen):
         self.draw_frame(screen)
         
         # Actualizar efecto typewriter
-        self.update_typewriter()
+        self.update_typewriter(self.get_texts())
+        
+        # Actualizar imagen a mostrar
+        self.update_image_display()
+        
+        # Actualizar transparencia de imagen
+        self.update_image_alpha()
+        
+        # Dibujar imagen explicativa
+        self.draw_explicative_image(screen)
         
         # Dibujar box de texto
-        self.draw_text_box(screen)
+        self.draw_text_box(screen, self.get_texts())
         
         # Dibujar UI
         self.ui.update(screen)
@@ -783,38 +896,30 @@ class HistoryScene(Scene):
         self.draw_table(screen)
         self.ui.update(screen)
 
-class VictoryScene(Scene):
+class VictoryScene(TextScene):
     def setup(self):
         self.ui = UIManager(self.game)
         
         # Botón para volver al menú
         action_menu = lambda: self.game.goto_scene("menu")
-        self.ui.add_button("menu", (150, 50), action_menu, "Menú Principal", center=(WIDTH//2, HEIGHT-100))
+        self.ui.add_button("menu", (150, 50), action_menu, "Menú Principal", center=(WIDTH//2 - 100, HEIGHT-80))
         
         # Botón para jugar de nuevo
         action_play_again = lambda: self.game.goto_scene("setup")
-        self.ui.add_button("play_again", (150, 50), action_play_again, "Jugar de Nuevo", center=(WIDTH//2, HEIGHT-50))
+        self.ui.add_button("play_again", (150, 50), action_play_again, "Jugar de Nuevo", center=(WIDTH//2 + 100, HEIGHT-80))
         
         # Variables para efectos de celebración
         self.frame_counter = 0
         self.celebration_particles = []
         self.generate_particles()
-        
-        # Texto de victoria
-        self.victory_texts = [
+
+    def get_texts(self):
+        return [
             "¡VICTORIA!",
             "¡El equipo de Ensalada César ha triunfado!",
             "Has derrotado a Arturo Prat y su flota invisible.",
-            "La maldición del código eterno ha sido rota.",
-            "Los estudiantes pueden regresar a su realidad...",
-            "¡Por ahora!"
+            "Los estudiantes pueden regresar a su realidad... ¡Por ahora!",
         ]
-        
-        # Efecto de typewriter para el texto
-        self.current_text = 0
-        self.current_char = 0
-        self.typewriter_speed = 3
-        self.finished_typing = False
 
     def generate_particles(self):
         """Generar partículas de celebración"""
@@ -855,25 +960,35 @@ class VictoryScene(Scene):
             pg.draw.circle(particle_surf, color, (2, 2), 2)
             screen.blit(particle_surf, (particle['x'], particle['y']))
 
-    def update_typewriter(self):
-        """Actualizar efecto typewriter para el texto de victoria"""
-        if self.finished_typing:
-            return
-            
-        self.frame_counter += 1
+    def draw_defeated_prat(self, screen):
+        """Dibujar imagen de Prat derrotado arriba de los botones"""
+        # Obtener la imagen
+        img = self.game.assets.images["prat_defeated"]
         
-        if self.frame_counter % self.typewriter_speed == 0:
-            if self.current_text < len(self.victory_texts):
-                text = self.victory_texts[self.current_text]
-                if self.current_char < len(text):
-                    self.current_char += 1
-                else:
-                    # Pasar al siguiente texto
-                    self.current_text += 1
-                    self.current_char = 0
-            else:
-                # Terminamos de escribir todo
-                self.finished_typing = True
+        # Calcular tamaño de la imagen (mantener proporción)
+        max_width = 400
+        max_height = 300
+        
+        # Calcular dimensiones manteniendo proporción
+        img_ratio = img.get_width() / img.get_height()
+        if img_ratio > max_width / max_height:
+            # Imagen más ancha que alta
+            display_width = max_width
+            display_height = int(max_width / img_ratio)
+        else:
+            # Imagen más alta que ancha
+            display_height = max_height
+            display_width = int(max_height * img_ratio)
+        
+        # Escalar imagen
+        scaled_img = pg.transform.smoothscale(img, (display_width, display_height))
+        
+        # Calcular posición centrada horizontalmente, arriba de los botones
+        x = (WIDTH - display_width) // 2
+        y = HEIGHT - 150 - display_height  # 150 píxeles arriba de los botones
+        
+        # Dibujar la imagen
+        screen.blit(scaled_img, (x, y))
 
     def draw_victory_text(self, screen):
         """Dibujar texto de victoria con efecto typewriter"""
@@ -882,12 +997,13 @@ class VictoryScene(Scene):
         font_small = pg.font.Font(None, 28)
         
         y_offset = HEIGHT // 4
+        texts = self.get_texts()
         
-        for i, text in enumerate(self.victory_texts):
-            if i < self.current_text:
+        for i, text in enumerate(texts):
+            if i < self.current_paragraph:
                 # Texto completo
                 display_text = text
-            elif i == self.current_text:
+            elif i == self.current_paragraph:
                 # Texto actual con typewriter
                 display_text = text[:self.current_char]
             else:
@@ -912,38 +1028,20 @@ class VictoryScene(Scene):
                 
                 y_offset += font.get_height() + 20
 
-    def handle_click(self, pos):
-        # Si hacemos clic en cualquier lugar, acelerar o completar el texto
-        if not self.finished_typing:
-            # Completar todo el texto inmediatamente
-            self.finished_typing = True
-            self.current_text = len(self.victory_texts)
-            self.current_char = 0
-        return False
-
     def update(self, screen):
         self.draw_frame(screen)
-        
-        # Actualizar partículas
         self.update_particles()
-        
-        # Dibujar partículas
         self.draw_particles(screen)
-        
-        # Actualizar typewriter
-        self.update_typewriter()
-        
-        # Dibujar texto de victoria
+        self.update_typewriter(self.get_texts())
         self.draw_victory_text(screen)
-        
-        # Dibujar UI
+        self.draw_defeated_prat(screen)
         self.ui.update(screen)
 
 class MatchScene(Scene):
     def setup(self, grid, objects):
         self.init_match(grid, objects)
+        self.game.event_manager.add_action_key(pg.K_SPACE, self.end_turn)
 
-        self.game.event_manager.add_action_key("end_turn", pg.K_RETURN)
 
     def handle_click(self, pos):
         # Verificar si el clic está en el panel de objetos
@@ -1143,7 +1241,31 @@ class MatchScene(Scene):
         self.ui = UIManager(self.game)
         action = self.end_turn
         self.ui.add_button("end_turn", (180, 50), action, "Terminar Turno", topleft=(WIDTH-220, HEIGHT-80))
+        
+        # Agregar botón 'Salir' en la esquina inferior izquierda
+        exit_action = lambda: self.game.goto_scene("menu")
+        self.ui.add_button("exit", (120, 50), exit_action, "Salir", topleft=(40, HEIGHT-80))
+        
         self.turn_ended = False
+
+        self.game.event_manager.add_action_key(pg.K_SPACE, self.end_turn)
+        
+        # Registrar cheat de bombas en el EventManager
+        self.game.event_manager.add_cheat_sequence("bomb_cheat", 241, 3, self.activate_bomb_cheat)
+
+    def activate_bomb_cheat(self):
+        """Activar el cheat de bombas"""
+        if 'bomb' in self.object_panel.items:
+            # Agregar 10 bombas
+            self.object_panel.items['bomb']['quantity'] += 10
+            
+            # Reproducir sonido de éxito
+            create_sound = self.game.assets.audio["sfx"]["create"]
+            create_sound.play()
+            
+            print("¡Cheat activado! +10 bombas")
+        else:
+            print("Error: No se encontró el objeto 'bomb' en el panel")
 
     def end_turn(self):
         if self.gridA.selected_target is not None or self.used_objects:
@@ -1780,6 +1902,8 @@ class AssetManager:
             "clear": pg.image.load("assets/img/clear.png").convert_alpha(),
             "title": pg.image.load("assets/img/tittle.png").convert_alpha(),
             "wave": pg.image.load("assets/img/wave.png").convert_alpha(),
+            "prat": pg.image.load("assets/img/prat.png").convert_alpha(),
+            "prat_defeated": pg.image.load("assets/img/prat_defeated.png").convert_alpha(),
         }
 
         # Create animated wave background with more waves
@@ -1818,8 +1942,25 @@ class Game:
             "victory": VictoryScene(self)
         }
 
+        # Registrar cheats globalmente
+        self.event_manager.add_cheat_sequence("bomb_cheat", pg.K_F10, 3, self.activate_bomb_cheat)
+
         self.current_scene = self.scenes["setup"] if DEV else self.scenes["menu"]
         self.current_scene.setup()
+
+    def activate_bomb_cheat(self):
+        """Activar el cheat de bombas - solo funciona en MatchScene"""
+        if hasattr(self.current_scene, 'object_panel') and 'bomb' in self.current_scene.object_panel.items:
+            # Agregar 10 bombas
+            self.current_scene.object_panel.items['bomb']['quantity'] += 10
+            
+            # Reproducir sonido de éxito
+            create_sound = self.assets.audio["sfx"]["create"]
+            create_sound.play()
+            
+            print("¡Cheat activado! +10 bombas")
+        else:
+            print("Cheat solo disponible durante el juego")
 
     def update(self, screen):
         self.event_manager.update()
@@ -1842,9 +1983,52 @@ class EventManager:
         self.game = game
         self.is_clicking = False
         self.actions = {}
+        self.cheat_sequences = {}  # Para manejar secuencias de cheat
+        self.cheat_timeout_max = 60  # 1 segundo a 60 FPS
 
     def add_action_key(self, key, callback):
         self.actions[key] = callback
+
+    def add_cheat_sequence(self, name, key, sequence_length, callback):
+        """Agregar una secuencia de cheat
+        name: nombre del cheat
+        key: tecla que activa el cheat
+        sequence_length: número de presiones requeridas
+        callback: función a ejecutar cuando se active el cheat
+        """
+        self.cheat_sequences[name] = {
+            'key': key,
+            'sequence_length': sequence_length,
+            'callback': callback,
+            'sequence': [],
+            'timeout': 0
+        }
+
+    def handle_cheat_key(self, key):
+        """Manejar presiones de tecla para cheats"""
+        current_time = self.game.frame
+        
+        for cheat_name, cheat_data in self.cheat_sequences.items():
+            if cheat_data['key'] == key:
+                # Agregar timestamp a la secuencia
+                cheat_data['sequence'].append(current_time)
+                
+                # Mantener solo las últimas presiones necesarias
+                if len(cheat_data['sequence']) > cheat_data['sequence_length']:
+                    cheat_data['sequence'].pop(0)
+                
+                # Verificar si tenemos la secuencia completa
+                if len(cheat_data['sequence']) == cheat_data['sequence_length']:
+                    # Verificar timeout
+                    time_diff = cheat_data['sequence'][-1] - cheat_data['sequence'][0]
+                    if time_diff <= self.cheat_timeout_max:
+                        # Activar cheat
+                        cheat_data['callback']()
+                        cheat_data['sequence'].clear()
+                    else:
+                        # Timeout expirado, limpiar secuencia
+                        cheat_data['sequence'].clear()
+                break
 
     def handle_key_down(self, key):
         if key == pg.K_ESCAPE:
@@ -1852,6 +2036,9 @@ class EventManager:
 
         if key in self.actions:
             self.actions[key]()
+
+        # Verificar si es una tecla de cheat
+        self.handle_cheat_key(key)
 
     def handle_click(self, pos):
         scene = self.game.current_scene
@@ -1866,13 +2053,13 @@ class EventManager:
             if ev.type == pg.QUIT:
                 self.game.running = False
 
-            if ev.type == pg.KEYDOWN:
+            elif ev.type == pg.KEYDOWN:
                 self.handle_key_down(ev.key)
 
-            if ev.type == pg.MOUSEBUTTONDOWN:
+            elif ev.type == pg.MOUSEBUTTONDOWN:
                 self.handle_click(ev.pos)
 
-            if ev.type == pg.MOUSEBUTTONUP:
+            elif ev.type == pg.MOUSEBUTTONUP:
                 self.is_clicking = True
 
 class AnimatedSprite:
