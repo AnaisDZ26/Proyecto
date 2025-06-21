@@ -330,7 +330,6 @@ Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List
 
 void usarObjeto(Partida *partida, char *buffer)
 {
-
     int code, ID;
     sscanf(buffer, "%*d %d", &ID);
 
@@ -945,7 +944,6 @@ void leerAccion(Partida *partida, char *buffer)
 
 void leerTurno(Partida *partida, char *eleccion)
 {
-
     int codigo, n_acciones;
     if (sscanf(eleccion, "%d %d", &codigo, &n_acciones) != 2)
     {
@@ -978,6 +976,30 @@ void leerTurno(Partida *partida, char *eleccion)
     mostrarMensajesEstado(partida);
 }
 
+bool verificarFinalizacion(Partida* partida) {
+    Jugador *current = list_first(partida->jugadores);
+    if (current == NULL) {
+        return true;
+    }
+    do {
+        bool swap = false;
+        for (int i = 0; i < current->tablero->alto; i++) {
+            for (int j = 0; j < current->tablero->ancho; j++) {
+                if (current->tablero->valores[i][j] > 0 && current->tablero->valores[i][j] != 99) {
+                    swap = true;
+                    break;
+                }
+            }
+            if (swap) break;
+        }
+        if (!swap) {
+            return true;
+        }
+        current = list_next(partida->jugadores);
+    } while (current != NULL);
+    return false;
+}
+
 int iniciarJuego(const char *archivo)
 {
     char fullpath[256];
@@ -996,13 +1018,18 @@ int iniciarJuego(const char *archivo)
     char buffer[256];
     while (fgets(buffer, sizeof(buffer), stdin))
     {
-        // Remove newline character if present
         size_t len = strlen(buffer);
         if (len > 0 && buffer[len-1] == '\n')
         {
             buffer[len-1] = '\0';
         }
-        
+        if(!verificarFinalizacion(partida))
+        {
+            char *mensaje = malloc(sizeof(char) * 256);
+            sprintf(mensaje, "777");
+            list_pushBack(partida->mensajesEstado, mensaje);
+        }
+
         leerTurno(partida, buffer);
         fflush(stdout);
     }
