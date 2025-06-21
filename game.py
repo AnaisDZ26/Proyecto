@@ -33,6 +33,22 @@ class Grid:
         self.grid_width = (self.cell_size * self.size[0]) + (self.margin * (self.size[0] - 1))
         self.grid_height = (self.cell_size * self.size[1]) + (self.margin * (self.size[1] - 1))
         
+    def draw_grid_frame(self, screen):
+        """Draw a rounded box frame around the grid with 50% opacity"""
+        # Create a surface with alpha channel for transparency
+        frame_surface = pg.Surface((self.grid_width + 20, self.grid_height + 20), pg.SRCALPHA)
+        
+        # Black color with 50% opacity (50 alpha value)
+        frame_color = (0, 0, 0, 80)
+        
+        # Frame dimensions - slightly larger than the grid
+        frame_rect = pg.Rect(0, 0, self.grid_width + 20, self.grid_height + 20)
+        
+        # Draw the rounded rectangle frame
+        pg.draw.rect(frame_surface, frame_color, frame_rect, border_radius=15)
+        
+        # Blit the frame surface onto the screen, positioned behind the grid
+        screen.blit(frame_surface, (self.start_pos.x - 10, self.start_pos.y - 10))
     
     def draw_boat(self, screen, boat, is_preview=False):
         
@@ -79,6 +95,9 @@ class Grid:
         screen_middle = pg.Vector2(center_x, center_y)
         grid_middle = pg.Vector2(self.grid_width // 2, self.grid_height // 2)
         self.start_pos = screen_middle - grid_middle
+
+        # Draw the grid frame first (behind the grid)
+        self.draw_grid_frame(screen)
 
         grid_surf = pg.Surface((self.grid_width, self.grid_height), pg.SRCALPHA)
 
@@ -187,6 +206,9 @@ class EnemyGrid(Grid):
         screen_middle = pg.Vector2(x, y)
         grid_middle = pg.Vector2(self.grid_width // 2, self.grid_height // 2)
         self.start_pos = screen_middle - grid_middle
+
+        # Draw the grid frame first (behind the grid)
+        self.draw_grid_frame(screen)
 
         grid_surf = pg.Surface((self.grid_width, self.grid_height), pg.SRCALPHA)
 
@@ -403,12 +425,16 @@ class SetupObjectPanel(ObjectPanel):
             if rects['minus'].collidepoint(local_pos):
                 if self.items[item_name]['quantity'] > 0:
                     self.items[item_name]['quantity'] -= 1
-                    mixer.Sound(audio["hover"]).play()
+                    hover_audio = self.game.assets.audio["sfx"]["hover"]
+                    hover_audio.play()
                 else:
-                    mixer.Sound(audio["deny"]).play()
+                    deny_audio = self.game.assets.audio["sfx"]["deny"]
+                    deny_audio.play()
+                    
             elif rects['plus'].collidepoint(local_pos):
                 self.items[item_name]['quantity'] += 1
-                pg.mixer.Sound(self.game.assets.audio["music"]["hover"]).play()
+                hover_audio = self.game.assets.audio["sfx"]["hover"]
+                hover_audio.play()
 
     def update(self, screen, x, y):
         self.panel_x = x
@@ -470,12 +496,30 @@ class Scene:
 
     def update(self, screen):
         pass
+        
+    def draw_frame(self, screen):
+        """Draw a rounded black box frame with 50% opacity around the screen"""
+        # Create a surface with alpha channel for transparency
+        frame_surface = pg.Surface((WIDTH, HEIGHT), pg.SRCALPHA)
+        
+        # Black color with 50% opacity (128 alpha value)
+        frame_color = (0, 0, 0, 50)
+        
+        # Frame dimensions - leaving some margin from screen edges
+        margin = 20
+        frame_rect = pg.Rect(margin, margin, WIDTH - 2 * margin, HEIGHT - 2 * margin)
+        
+        # Draw the rounded rectangle frame
+        pg.draw.rect(frame_surface, frame_color, frame_rect, border_radius=15)
+        
+        # Blit the frame surface onto the screen
+        screen.blit(frame_surface, (0, 0))
 
 class MenuScene(Scene):
     def setup(self):
         self.ui = UIManager(self.game)
 
-        action = lambda: self.game.goto_scene("setup")
+        action = lambda: self.game.goto_scene("intro")
         play_center = (WIDTH / 2, HEIGHT / 2)
         self.ui.add_button( "play", (200, 100), action, "Jugar", center=play_center)
 
@@ -495,6 +539,175 @@ class MenuScene(Scene):
         title_y = HEIGHT // 4 - title_height // 2
         screen.blit(scaled_title, (title_x, title_y))
         
+        self.ui.update(screen)
+        
+    def draw_frame(self, screen):
+        """Override to not draw frame in menu scene"""
+        pass
+
+class IntroScene(Scene):
+    def setup(self):
+        self.ui = UIManager(self.game)
+        
+        # Botón para continuar al setup
+        action_continue = lambda: self.game.goto_scene("setup")
+        self.ui.add_button("continue", (150, 50), action_continue, "Continuar", topleft=(WIDTH-180, HEIGHT-80))
+        
+        # Botón para volver al menú
+        action_back = lambda: self.game.goto_scene("menu")
+        self.ui.add_button("back", (120, 50), action_back, "Volver", topleft=(60, HEIGHT-80))
+        
+        # Texto del intro con párrafos
+        self.paragraphs = [
+            "Mientras el grupo 'Ensalada César' se encontraba sumergido en el caos del proyecto final de Estructura de Datos, un evento inesperado sacudió su realidad: sus computadores cobraron vida y los abdujeron sin previo aviso.",
+            "",
+            "Al abrir los ojos, se vieron atrapados en un universo alternativo lleno de lógica distorsionada, algoritmos flotantes... y mares infinitos.",
+            "",
+            "Ahora, en este mundo donde la programación y la fantasía chocan, deberán enfrentar a un enemigo legendario: Arturo Prat y su temido escuadrón de marines, comandando una flota de buques invisibles.",
+            "",
+            "Solo tú, como jugador, puedes ayudarlos. Usa bombas, torpedos, catalejos y cañones para detectar y destruir los barcos enemigos ocultos en la niebla digital.",
+            "",
+            "Planea tu estrategia, apunta con precisión y lleva al equipo de Ensalada César a la victoria!",
+            "",
+            "Solo así podrán romper la maldición del código eterno y regresar a su realidad... antes de que sea demasiado tarde.",
+        ]
+        
+        # Variables para el efecto typewriter
+        self.current_paragraph = 0
+        self.current_char = 0
+        self.typewriter_speed = 2  # Caracteres por frame
+        self.frame_counter = 0
+        self.finished_typing = False
+        
+        # Configuración del box de texto
+        self.text_box_width = WIDTH - 100
+        self.text_box_height = 300
+        self.text_box_x = 50
+        self.text_box_y = HEIGHT - self.text_box_height - 100
+        
+        # Configuración del texto
+        self.font = pg.font.Font(None, 24)
+        self.line_height = 30
+        self.max_chars_per_line = 80
+
+    def wrap_text(self, text, max_width):
+        """Envolver texto para que quepa en el ancho especificado"""
+        words = text.split(' ')
+        lines = []
+        current_line = []
+        
+        for word in words:
+            test_line = ' '.join(current_line + [word])
+            test_width = self.font.size(test_line)[0]
+            
+            if test_width <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+        
+        if current_line:
+            lines.append(' '.join(current_line))
+        
+        return lines
+
+    def update_typewriter(self):
+        """Actualizar el efecto typewriter"""
+        if self.finished_typing:
+            return
+            
+        self.frame_counter += 1
+        
+        if self.frame_counter % self.typewriter_speed == 0:
+            if self.current_paragraph < len(self.paragraphs):
+                paragraph = self.paragraphs[self.current_paragraph]
+                if paragraph == "":  # Línea vacía
+                    self.current_paragraph += 1
+                    self.current_char = 0
+                else:
+                    # Calcular el número total de caracteres en el párrafo actual
+                    lines = self.wrap_text(paragraph, self.text_box_width - 60)
+                    total_chars = sum(len(line) for line in lines)
+                    
+                    if self.current_char < total_chars:
+                        self.current_char += 1
+                    else:
+                        # Pasar al siguiente párrafo
+                        self.current_paragraph += 1
+                        self.current_char = 0
+            else:
+                # Terminamos de escribir todo
+                self.finished_typing = True
+
+    def draw_text_box(self, screen):
+        """Dibujar el box de texto con el efecto typewriter"""
+        # Dibujar fondo del box
+        box_rect = pg.Rect(self.text_box_x, self.text_box_y, self.text_box_width, self.text_box_height)
+        pg.draw.rect(screen, (10, 70, 135), box_rect, border_radius=10)
+        
+        # Crear superficie para el texto con transparencia
+        text_surface = pg.Surface((self.text_box_width - 40, self.text_box_height - 40), pg.SRCALPHA)
+        
+        current_y = 0
+        
+        # Dibujar párrafos completos
+        for i in range(self.current_paragraph):
+            if i < len(self.paragraphs):
+                paragraph = self.paragraphs[i]
+                if paragraph == "":  # Línea vacía
+                    current_y += self.line_height // 2
+                else:
+                    lines = self.wrap_text(paragraph, self.text_box_width - 60)
+                    for line in lines:
+                        text = self.font.render(line, True, (255, 255, 255))
+                        text_surface.blit(text, (0, current_y))
+                        current_y += self.line_height
+        
+        # Dibujar párrafo actual con efecto typewriter
+        if self.current_paragraph < len(self.paragraphs):
+            paragraph = self.paragraphs[self.current_paragraph]
+            if paragraph == "":  # Línea vacía
+                current_y += self.line_height // 2
+            else:
+                lines = self.wrap_text(paragraph, self.text_box_width - 60)
+                chars_processed = 0
+                
+                for line in lines:
+                    # Calcular cuántos caracteres de esta línea mostrar
+                    line_length = len(line)
+                    chars_to_show = max(0, min(line_length, self.current_char - chars_processed))
+                    
+                    if chars_to_show > 0:
+                        display_text = line[:chars_to_show]
+                        text = self.font.render(display_text, True, (255, 255, 255))
+                        text_surface.blit(text, (0, current_y))
+                    
+                    chars_processed += line_length
+                    current_y += self.line_height
+        
+        # Dibujar la superficie de texto en el box
+        screen.blit(text_surface, (self.text_box_x + 20, self.text_box_y + 20))
+
+    def handle_click(self, pos):
+        # Si hacemos clic en cualquier lugar, acelerar o completar el texto
+        if not self.finished_typing:
+            # Completar todo el texto inmediatamente
+            self.finished_typing = True
+            self.current_paragraph = len(self.paragraphs)
+            self.current_char = 0
+        return False
+
+    def update(self, screen):
+        self.draw_frame(screen)
+        
+        # Actualizar efecto typewriter
+        self.update_typewriter()
+        
+        # Dibujar box de texto
+        self.draw_text_box(screen)
+        
+        # Dibujar UI
         self.ui.update(screen)
 
 class HistoryScene(Scene):
@@ -566,7 +779,164 @@ class HistoryScene(Scene):
                     x_offset += self.column_widths[col_idx]
 
     def update(self, screen):
+        self.draw_frame(screen)
         self.draw_table(screen)
+        self.ui.update(screen)
+
+class VictoryScene(Scene):
+    def setup(self):
+        self.ui = UIManager(self.game)
+        
+        # Botón para volver al menú
+        action_menu = lambda: self.game.goto_scene("menu")
+        self.ui.add_button("menu", (150, 50), action_menu, "Menú Principal", center=(WIDTH//2, HEIGHT-100))
+        
+        # Botón para jugar de nuevo
+        action_play_again = lambda: self.game.goto_scene("setup")
+        self.ui.add_button("play_again", (150, 50), action_play_again, "Jugar de Nuevo", center=(WIDTH//2, HEIGHT-50))
+        
+        # Variables para efectos de celebración
+        self.frame_counter = 0
+        self.celebration_particles = []
+        self.generate_particles()
+        
+        # Texto de victoria
+        self.victory_texts = [
+            "¡VICTORIA!",
+            "¡El equipo de Ensalada César ha triunfado!",
+            "Has derrotado a Arturo Prat y su flota invisible.",
+            "La maldición del código eterno ha sido rota.",
+            "Los estudiantes pueden regresar a su realidad...",
+            "¡Por ahora!"
+        ]
+        
+        # Efecto de typewriter para el texto
+        self.current_text = 0
+        self.current_char = 0
+        self.typewriter_speed = 3
+        self.finished_typing = False
+
+    def generate_particles(self):
+        """Generar partículas de celebración"""
+        for _ in range(50):
+            particle = {
+                'x': random.randint(0, WIDTH),
+                'y': random.randint(0, HEIGHT),
+                'vx': random.uniform(-3, 3),
+                'vy': random.uniform(-5, -1),
+                'life': random.randint(60, 120),
+                'color': random.choice([(255, 215, 0), (255, 255, 255), (255, 100, 100), (100, 255, 100), (100, 100, 255)])
+            }
+            self.celebration_particles.append(particle)
+
+    def update_particles(self):
+        """Actualizar partículas de celebración"""
+        for particle in self.celebration_particles[:]:
+            particle['x'] += particle['vx']
+            particle['y'] += particle['vy']
+            particle['vy'] += 0.1  # Gravedad
+            particle['life'] -= 1
+            
+            if particle['life'] <= 0:
+                self.celebration_particles.remove(particle)
+        
+        # Regenerar partículas si se acabaron
+        if len(self.celebration_particles) < 20:
+            self.generate_particles()
+
+    def draw_particles(self, screen):
+        """Dibujar partículas de celebración"""
+        for particle in self.celebration_particles:
+            alpha = min(255, particle['life'] * 3)
+            color = (*particle['color'], alpha)
+            
+            # Crear superficie con transparencia
+            particle_surf = pg.Surface((4, 4), pg.SRCALPHA)
+            pg.draw.circle(particle_surf, color, (2, 2), 2)
+            screen.blit(particle_surf, (particle['x'], particle['y']))
+
+    def update_typewriter(self):
+        """Actualizar efecto typewriter para el texto de victoria"""
+        if self.finished_typing:
+            return
+            
+        self.frame_counter += 1
+        
+        if self.frame_counter % self.typewriter_speed == 0:
+            if self.current_text < len(self.victory_texts):
+                text = self.victory_texts[self.current_text]
+                if self.current_char < len(text):
+                    self.current_char += 1
+                else:
+                    # Pasar al siguiente texto
+                    self.current_text += 1
+                    self.current_char = 0
+            else:
+                # Terminamos de escribir todo
+                self.finished_typing = True
+
+    def draw_victory_text(self, screen):
+        """Dibujar texto de victoria con efecto typewriter"""
+        font_large = pg.font.Font(None, 72)
+        font_medium = pg.font.Font(None, 36)
+        font_small = pg.font.Font(None, 28)
+        
+        y_offset = HEIGHT // 4
+        
+        for i, text in enumerate(self.victory_texts):
+            if i < self.current_text:
+                # Texto completo
+                display_text = text
+            elif i == self.current_text:
+                # Texto actual con typewriter
+                display_text = text[:self.current_char]
+            else:
+                # Texto futuro (no mostrar)
+                continue
+            
+            if display_text:
+                # Seleccionar fuente según el texto
+                if i == 0:  # "¡VICTORIA!"
+                    font = font_large
+                    color = (255, 215, 0)  # Dorado
+                elif i == 1:  # Primera línea de descripción
+                    font = font_medium
+                    color = (255, 255, 255)
+                else:  # Resto del texto
+                    font = font_small
+                    color = (200, 200, 200)
+                
+                text_surface = font.render(display_text, True, color)
+                text_rect = text_surface.get_rect(center=(WIDTH//2, y_offset))
+                screen.blit(text_surface, text_rect)
+                
+                y_offset += font.get_height() + 20
+
+    def handle_click(self, pos):
+        # Si hacemos clic en cualquier lugar, acelerar o completar el texto
+        if not self.finished_typing:
+            # Completar todo el texto inmediatamente
+            self.finished_typing = True
+            self.current_text = len(self.victory_texts)
+            self.current_char = 0
+        return False
+
+    def update(self, screen):
+        self.draw_frame(screen)
+        
+        # Actualizar partículas
+        self.update_particles()
+        
+        # Dibujar partículas
+        self.draw_particles(screen)
+        
+        # Actualizar typewriter
+        self.update_typewriter()
+        
+        # Dibujar texto de victoria
+        self.draw_victory_text(screen)
+        
+        # Dibujar UI
         self.ui.update(screen)
 
 class MatchScene(Scene):
@@ -772,7 +1142,7 @@ class MatchScene(Scene):
         # Agregar botón 'Terminar Turno'
         self.ui = UIManager(self.game)
         action = self.end_turn
-        self.ui.add_button("end_turn", (180, 50), action, "Terminar Turno", topleft=(WIDTH-200, HEIGHT-70))
+        self.ui.add_button("end_turn", (180, 50), action, "Terminar Turno", topleft=(WIDTH-220, HEIGHT-80))
         self.turn_ended = False
 
     def end_turn(self):
@@ -848,6 +1218,10 @@ class MatchScene(Scene):
                         if message_type == 9: # Informe de Estado Casilla
                             x, y, value = map(int, message.split()[1:])
                             self.gridA.update_cell(x, y, value)
+                        elif message_type == 777: # Código de victoria
+                            # ¡Victoria! Cambiar a la escena de victoria
+                            self.game.goto_scene("victory")
+                            return
                         # Aquí puedes procesar cada mensaje según sea necesario
             except (OSError, IOError) as e:
                 print(f"Error al leer respuesta del backend: {e}")
@@ -860,10 +1234,12 @@ class MatchScene(Scene):
 
     def draw_fog(self, screen, box):
         fog_surf = pg.Surface(box.size, pg.SRCALPHA)
-        fog_surf.fill((0, 0, 0, 100))
+        fog_surf.fill((0, 0, 0, 20))
         screen.blit(fog_surf, box.topleft)
 
     def update(self, screen):
+        self.draw_frame(screen)
+
         # Dibujar la cuadrícula
         posA = pg.Vector2(2 * WIDTH / 3, HEIGHT / 2)
         posB = pg.Vector2(WIDTH / 4, HEIGHT / 3)
@@ -906,17 +1282,20 @@ class SetupScene(Scene):
         self.ui = UIManager(self.game)
 
         action = lambda: self.start_match()
-        self.ui.add_button( "start", (120, 40), action, "Comenzar", center=(WIDTH - 70, HEIGHT - 30))
+        self.ui.add_button( "start", (120, 40), action, "Comenzar", center=(WIDTH - 90, HEIGHT - 50))
+
+        action = lambda: self.game.goto_scene("menu")
+        self.ui.add_button("back", (120, 40), action, "Volver", center=(90, HEIGHT - 50))
 
         # Agregar botón de aleatorización en la parte superior del panel selector de barcos
         randomize_action = lambda: self.randomize_boats()
-        randomize_center = (70, HEIGHT//2 - HEIGHT//3 - 30)
+        randomize_center = (140, HEIGHT//2 - HEIGHT//3 - 30)
         dice_img = self.game.assets.images["dice"]
         self.ui.add_button("randomize", (50, 50), randomize_action, image=dice_img, opacity=0.4, center=randomize_center)
 
         # Agregar botón de limpiar junto al botón de aleatorización
         clear_action = lambda: self.clear_all_boats()
-        clear_center = (130, HEIGHT//2 - HEIGHT//3 - 30)
+        clear_center = (200, HEIGHT//2 - HEIGHT//3 - 30)
         clear_img = self.game.assets.images["clear"]
         self.ui.add_button("clear", (50, 50), clear_action, image=clear_img, opacity=0.4, center=clear_center)
 
@@ -1090,13 +1469,15 @@ class SetupScene(Scene):
         return False
 
     def update(self, screen):
-        self.grid.update(screen, WIDTH / 2, HEIGHT / 2) 
+        self.draw_frame(screen)
+
+        self.grid.update(screen, WIDTH / 2 - 60, HEIGHT / 2) 
         rect = pg.Rect(0, 0, 80, 2*HEIGHT//3)
-        rect.center = (100, HEIGHT / 2)
-        pg.draw.rect(screen, (12, 139, 221), rect, border_radius=5)
+        rect.center = (170, HEIGHT / 2)
+        pg.draw.rect(screen, (13, 82, 154), rect, border_radius=5)
 
         self.ui.update(screen)
-        self.object_panel.update(screen, WIDTH - self.object_panel.width - 50, HEIGHT // 2 - self.object_panel.height // 2)
+        self.object_panel.update(screen, WIDTH - self.object_panel.width - 100, HEIGHT // 2 - self.object_panel.height // 2)
 
         margin = 5
         size = rect.size[0] - (margin * 2)
@@ -1137,6 +1518,8 @@ class SetupScene(Scene):
                 screen.blit(surf, (pos.x - offset_x, pos.y - offset_y))
                 
                 pos.y += size + margin
+
+        
 
 class InfoBox:
 
@@ -1428,11 +1811,14 @@ class Game:
 
         self.scenes = {
             "menu": MenuScene(self),
+            "intro": IntroScene(self),
             "setup": SetupScene(self),
             "match": MatchScene(self),
-            "history": HistoryScene(self)
+            "history": HistoryScene(self),
+            "victory": VictoryScene(self)
         }
-        self.current_scene = self.scenes["menu"]
+
+        self.current_scene = self.scenes["setup"] if DEV else self.scenes["menu"]
         self.current_scene.setup()
 
     def update(self, screen):
