@@ -9,6 +9,7 @@
 
 #define ID_LENGTH 5
 #define MAX_GRID 20 // Tamaño máximo permitido de la cuadrícula
+#define DEV 1
 
 typedef struct
 {
@@ -1031,7 +1032,7 @@ void leerTurno(Partida *partida, char *eleccion)
     }
 }
 
-bool verificarFinalizacion(Partida *partida)
+int verificarFinalizacion(Partida *partida) // 0 - No finalizado, 1 - Ganador, 2 - Perdedor
 {
     Jugador *current = list_first(partida->jugadores);
     if (current == NULL)
@@ -1039,6 +1040,18 @@ bool verificarFinalizacion(Partida *partida)
         return true;
     }
 
+    FILE *file = NULL;
+    if (DEV)
+    {
+        file = fopen("cache/state.txt", "w");
+        if (!file)
+        {
+            printf("Error: No se pudo abrir el archivo para registrar el estado\n");
+            return true;
+        }
+    }
+
+    int winner = 1;
     // Check both players
     do
     {
@@ -1053,22 +1066,67 @@ bool verificarFinalizacion(Partida *partida)
                     hasIntactShips = true;
                     break;
                 }
+
+                if (DEV)
+                    fprintf(file, "%d ", current->tablero->valores[i][j]);
+                
             }
-            if (hasIntactShips)
+
+            if (DEV)    
+                fprintf(file, "\n");
+
+            if (hasIntactShips && !DEV)
                 break;
         }
 
+        if (DEV)
+            fprintf(file, "\n");
+
         // If this player has no intact ships, game is over
         if (!hasIntactShips)
-        {
-            return true;
-        }
+            return winner;
+        
+        winner++;
 
         current = list_next(partida->jugadores);
     } while (current != NULL);
 
+    if (DEV)
+        fclose(file);
+
     // Both players still have intact ships
-    return false;
+    return 0;
+}
+
+void tomarDecision(Partida *partida)
+{
+    Jugador *jugador = list_first(partida->jugadores);
+    Tablero *tablero = jugador->tablero;
+
+    // Ataque secuencial
+    for (int i = 0; i < tablero->alto; i++)
+        for (int j = 0; j < tablero->ancho; j++)
+        {
+            int valor = tablero->valores[i][j];
+            if (valor >= 0 && valor != 99)
+            {
+                if (valor > 0)
+                    valor = -valor;
+
+                if (valor == 0)
+                    valor = 99;
+
+                tablero->valores[i][j] = valor;
+                
+
+                char *mensaje = malloc(sizeof(char) * 256);
+                sprintf(mensaje, "4 %d %d", i, j);
+                list_pushBack(partida->mensajesEstado, mensaje);
+
+                return;
+            }
+            
+        }
 }
 
 int iniciarJuego(const char *archivo)
@@ -1096,14 +1154,16 @@ int iniciarJuego(const char *archivo)
         }
 
         leerTurno(partida, buffer);
+        tomarDecision(partida);
 
         // Check if game is finished after processing the turn
-        if (verificarFinalizacion(partida))
+        int resultado = verificarFinalizacion(partida);
+        if (resultado > 0)
         {
             char *mensaje = malloc(sizeof(char) * 256);
-            sprintf(mensaje, "777");
+            sprintf(mensaje, "777 %d", resultado);
             list_pushBack(partida->mensajesEstado, mensaje);
-        }
+        }   
 
         mostrarMensajesEstado(partida);
         fflush(stdout);

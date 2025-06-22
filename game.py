@@ -33,6 +33,18 @@ class Grid:
         self.grid_width = (self.cell_size * self.size[0]) + (self.margin * (self.size[0] - 1))
         self.grid_height = (self.cell_size * self.size[1]) + (self.margin * (self.size[1] - 1))
         
+        # Add state grid to track cell states (hit/miss)
+        self.state_grid = [[0 for _ in range(self.size[1])] for _ in range(self.size[0])]
+        
+    def mark_cell(self, x, y, value):
+        """Mark a cell as hit or miss and update visual representation"""
+        self.state_grid[y][x] = value
+        
+        # Play sound if it's a hit (negative value indicates hit)
+        if value < 0:
+            destroy_sound = self.scene.game.assets.audio["sfx"]["destroy"]
+            destroy_sound.play()
+        
     def draw_grid_frame(self, screen):
         frame_surface = pg.Surface((self.grid_width + 20, self.grid_height + 20), pg.SRCALPHA)
         frame_color = (0, 0, 0, 80)
@@ -73,7 +85,23 @@ class Grid:
         return rect
     
     def draw(self, surf):
-        pass
+        # Draw hit/miss indicators on the grid
+        n, m = self.size
+        for i in range(n):
+            for j in range(m):
+                w = self.cell_size + self.margin
+                s = self.cell_size
+                rect = pg.Rect(i * w, j * w, s, s)
+                
+                # Draw darker box for misses (value = 99)
+                if self.state_grid[i][j] == 99:
+                    pg.draw.rect(surf, (5, 35, 67), rect, border_radius=5)
+                
+                # Draw broken image for hits (negative values)
+                if self.state_grid[i][j] < 0:
+                    broken_img = self.scene.game.assets.images["broken"]
+                    broken_img = pg.transform.smoothscale(broken_img, (s, s))
+                    surf.blit(broken_img, rect)
 
     def update(self, screen, center_x, center_y):
 
@@ -606,9 +634,8 @@ class MenuScene(Scene):
 
 class TextScene(Scene):
     """Base class for scenes with typewriter text effects"""
-    
-    def __init__(self, game):
-        super().__init__(game)
+
+    def setup(self):
         # Variables for the effect typewriter
         self.current_paragraph = 0
         self.current_char = 0
@@ -626,6 +653,8 @@ class TextScene(Scene):
         self.font = pg.font.Font(None, 24)
         self.line_height = 30
         self.max_chars_per_line = 80
+
+        self.start()
 
     def wrap_text(self, text, max_width):
         """Envolver texto para que quepa en el ancho especificado"""
@@ -741,7 +770,19 @@ class TextScene(Scene):
 
 class IntroScene(TextScene):
 
-    def setup(self):
+    def start(self):
+
+        self.text_box_width = (WIDTH // 2) - 50  # Half screen width minus margin
+        self.text_box_height = HEIGHT - 200  # Most of screen height
+        self.text_box_x = 50  # Left margin
+        self.text_box_y = 100  # Top margin
+
+        self.current_paragraph = 0
+        self.current_char = 0
+        self.typewriter_speed = 2  # Caracteres por frame
+        self.frame_counter = 0
+        self.finished_typing = False
+
         self.start_frame = int(self.game.frame)
         self.ui = UIManager(self.game)
         
@@ -810,27 +851,17 @@ class IntroScene(TextScene):
                 self.image_alpha = max(0, self.image_alpha - 5)  # Fade out
 
     def draw_explicative_image(self, screen):
-        """Dibujar imagen explicativa en una caja centrada arriba del texto"""
+        """Dibujar imagen explicativa centrada en el lado derecho"""
         if not self.current_image or self.image_alpha <= 0:
             return
             
         # Obtener la imagen
         img = self.game.assets.images[self.current_image]
         
-        # Calcular tamaño de la imagen (mantener proporción)
-        max_width = 300
-        max_height = 200
-        
-        # Calcular dimensiones manteniendo proporción
-        img_ratio = img.get_width() / img.get_height()
-        if img_ratio > max_width / max_height:
-            # Imagen más ancha que alta
-            display_width = max_width
-            display_height = int(max_width / img_ratio)
-        else:
-            # Imagen más alta que ancha
-            display_height = max_height
-            display_width = int(max_height * img_ratio)
+        # Escala simple para la imagen
+        scale_factor = 0.6  # Ajusta este valor para cambiar el tamaño
+        display_width = int(img.get_width() * scale_factor)
+        display_height = int(img.get_height() * scale_factor)
         
         # Escalar imagen
         scaled_img = pg.transform.smoothscale(img, (display_width, display_height))
@@ -840,23 +871,13 @@ class IntroScene(TextScene):
         img_surface.set_alpha(self.image_alpha)
         img_surface.blit(scaled_img, (0, 0))
         
-        # Calcular posición centrada horizontalmente
-        x = (WIDTH - display_width) // 2
-        y = self.text_box_y - display_height - 30  # 30 píxeles arriba del texto
+        # Posición centrada en el lado derecho
+        center_x = 3 * WIDTH // 4
+        center_y = HEIGHT // 2
         
-        # Dibujar fondo de la caja
-        box_padding = 20
-        box_rect = pg.Rect(x - box_padding, y - box_padding, 
-                          display_width + box_padding * 2, 
-                          display_height + box_padding * 2)
-        
-        # Crear superficie para el fondo con transparencia
-        bg_surface = pg.Surface((box_rect.width, box_rect.height), pg.SRCALPHA)
-        bg_alpha = int(self.image_alpha * 0.8)  # Fondo ligeramente más transparente
-        bg_surface.fill((10, 70, 135, bg_alpha))
-        
-        # Dibujar el fondo
-        # screen.blit(bg_surface, box_rect)
+        # Calcular posición para centrar la imagen
+        x = center_x - display_width // 2
+        y = center_y - display_height // 2
         
         # Dibujar la imagen
         screen.blit(img_surface, (x, y))
@@ -955,9 +976,14 @@ class HistoryScene(Scene):
         self.draw_table(screen)
         self.ui.update(screen)
 
-class VictoryScene(TextScene):
-    def setup(self):
+class FinalScene(TextScene):
+
+    def custom_start(self):
+        pass
+
+    def start(self):
         self.ui = UIManager(self.game)
+        self.start_frame = int(self.game.frame)
         
         # Botón para volver al menú
         action_menu = lambda: self.game.goto_scene("menu")
@@ -970,59 +996,14 @@ class VictoryScene(TextScene):
         # Variables para efectos de celebración
         self.frame_counter = 0
         self.celebration_particles = []
-        self.generate_particles()
 
-    def get_texts(self):
-        return [
-            "¡VICTORIA!",
-            "¡El equipo de Ensalada César ha triunfado!",
-            "Has derrotado a Arturo Prat y su flota invisible.",
-            "Los estudiantes pueden regresar a su realidad... ¡Por ahora!",
-        ]
+        self.custom_start()
 
-    def generate_particles(self):
-        """Generar partículas de celebración"""
-        for _ in range(50):
-            particle = {
-                'x': random.randint(0, WIDTH),
-                'y': random.randint(0, HEIGHT),
-                'vx': random.uniform(-3, 3),
-                'vy': random.uniform(-5, -1),
-                'life': random.randint(60, 120),
-                'color': random.choice([(255, 215, 0), (255, 255, 255), (255, 100, 100), (100, 255, 100), (100, 100, 255)])
-            }
-            self.celebration_particles.append(particle)
 
-    def update_particles(self):
-        """Actualizar partículas de celebración"""
-        for particle in self.celebration_particles[:]:
-            particle['x'] += particle['vx']
-            particle['y'] += particle['vy']
-            particle['vy'] += 0.1  # Gravedad
-            particle['life'] -= 1
-            
-            if particle['life'] <= 0:
-                self.celebration_particles.remove(particle)
-        
-        # Regenerar partículas si se acabaron
-        if len(self.celebration_particles) < 20:
-            self.generate_particles()
-
-    def draw_particles(self, screen):
-        """Dibujar partículas de celebración"""
-        for particle in self.celebration_particles:
-            alpha = min(255, particle['life'] * 3)
-            color = (*particle['color'], alpha)
-            
-            # Crear superficie con transparencia
-            particle_surf = pg.Surface((4, 4), pg.SRCALPHA)
-            pg.draw.circle(particle_surf, color, (2, 2), 2)
-            screen.blit(particle_surf, (particle['x'], particle['y']))
-
-    def draw_defeated_prat(self, screen):
+    def draw_prat(self, screen):
         """Dibujar imagen de Prat derrotado arriba de los botones"""
         # Obtener la imagen
-        img = self.game.assets.images["prat_defeated"]
+        img = self.game.assets.images[self.prat_asset]
         
         # Calcular tamaño de la imagen (mantener proporción)
         max_width = 400
@@ -1049,7 +1030,7 @@ class VictoryScene(TextScene):
         # Dibujar la imagen
         screen.blit(scaled_img, (x, y))
 
-    def draw_victory_text(self, screen):
+    def draw_text(self, screen):
         """Dibujar texto de victoria con efecto typewriter"""
         font_large = pg.font.Font(None, 72)
         font_medium = pg.font.Font(None, 36)
@@ -1089,12 +1070,83 @@ class VictoryScene(TextScene):
 
     def update(self, screen):
         self.draw_frame(screen)
+        self.update_typewriter(self.get_texts())
+        self.draw_text(screen)
+        self.draw_prat(screen)
+        self.loop(screen)
+        self.ui.update(screen)
+
+class VictoryScene(FinalScene):
+    prat_asset = "prat_defeated"
+
+    def custom_start(self):
+        self.generate_particles()
+
+    def get_texts(self):
+        return [
+            "¡VICTORIA!",
+            "¡El equipo de Ensalada César ha triunfado!",
+            "Has derrotado a Arturo Prat y su flota invisible.",
+            "Los estudiantes pueden regresar a su realidad... ¡Por ahora!",
+        ]
+    
+    def generate_particles(self):
+        """Generar partículas de celebración"""
+        for _ in range(50):
+            particle = {
+                'x': random.randint(0, WIDTH),
+                'y': random.randint(0, HEIGHT),
+                'vx': random.uniform(-3, 3),
+                'vy': random.uniform(-5, -1),
+                'life': random.randint(60, 120),
+                'color': random.choice([(255, 215, 0), (255, 255, 255), (255, 100, 100), (100, 255, 100), (100, 100, 255)])
+            }
+            self.celebration_particles.append(particle)
+
+    def update_particles(self):
+        """Actualizar partículas de celebración"""
+        for particle in self.celebration_particles[:]:
+            particle['x'] += particle['vx']
+            particle['y'] += particle['vy']
+            particle['vy'] += 0.1  # Gravedad
+            particle['life'] -= 1
+            
+            if particle['life'] <= 0:
+                self.celebration_particles.remove(particle)
+        
+        # Regenerar partículas si se acabaron
+        if len(self.celebration_particles) < 20:
+            self.generate_particles()
+
+    def draw_particles(self, screen):
+        """Dibujar partículas de celebración"""
+        for particle in self.celebration_particles:
+            alpha = min(255, particle['life'] * 3)
+            color = (*particle['color'], alpha)
+            
+            # Crear superficie con transparencia
+            particle_surf = pg.Surface((4, 4), pg.SRCALPHA)
+            pg.draw.circle(particle_surf, color, (2, 2), 2)
+            screen.blit(particle_surf, (particle['x'], particle['y']))
+
+    def loop(self, screen):
         self.update_particles()
         self.draw_particles(screen)
-        self.update_typewriter(self.get_texts())
-        self.draw_victory_text(screen)
-        self.draw_defeated_prat(screen)
-        self.ui.update(screen)
+    
+class DefeatScene(FinalScene):
+    prat_asset = "prat_winner"
+
+    def get_texts(self):
+        return [
+            "¡DERROTA!",
+            "¡El equipo de Ensalada César ha sido derrotado!",
+            "Has sido derrotado por Arturo Prat y su flota invisible.",
+            "Los estudiantes deben regresar a su realidad... ¡Por ahora!",
+        ]
+    
+    def loop(self, screen):
+        pass
+    
 
 class MatchScene(Scene):
     def setup(self, grid, objects):
@@ -1410,14 +1462,25 @@ class MatchScene(Scene):
                         print(message, end='\n')
 
                         message_type = int(message.split()[0])
+
+                        if message_type == 4:
+                            x, y = map(int, message.split()[1:])
+                            self.gridB.mark_cell(x, y, 99)
+
                         if message_type == 9: # Informe de Estado Casilla
                             x, y, value = map(int, message.split()[1:])
                             self.gridA.update_cell(x, y, value)
-                        elif message_type == 777: # Código de victoria
 
-                            # ¡Victoria! Cambiar a la escena de victoria
+                        if message_type == 777: # Código de Fin de Juego
+
                             self.proc.kill()
-                            self.game.goto_scene("victory")
+
+                            result = int(message.split()[1])
+                            if result == 1:
+                                self.game.goto_scene("defeat")
+                            elif result == 2:
+                                self.game.goto_scene("victory")  
+
                             return
                         # Aquí puedes procesar cada mensaje según sea necesario
             except (OSError, IOError) as e:
@@ -1984,6 +2047,7 @@ class AssetManager:
             "wave": pg.image.load("assets/img/wave.png").convert_alpha(),
             "prat": pg.image.load("assets/img/prat.png").convert_alpha(),
             "prat_defeated": pg.image.load("assets/img/prat_defeated.png").convert_alpha(),
+            "prat_winner": pg.image.load("assets/img/prat_winner.png").convert_alpha(),
         }
 
         # Create animated wave background with more waves
@@ -2019,7 +2083,8 @@ class Game:
             "setup": SetupScene(self),
             "match": MatchScene(self),
             "history": HistoryScene(self),
-            "victory": VictoryScene(self)
+            "victory": VictoryScene(self),
+            "defeat": DefeatScene(self)
         }
 
         # Registrar cheats globalmente
