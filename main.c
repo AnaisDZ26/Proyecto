@@ -40,6 +40,7 @@ typedef struct
     List *jugadores;
     List *mensajesEstado;
     Stack *historial;
+    FILE *archivo_partida;
 } Partida;
 
 typedef struct
@@ -868,61 +869,45 @@ int mostrarAyuda()
     return 0;
 }
 
+void cerrarArchivoPartida(Partida *partida)
+{
+    fclose(partida->archivo_partida);
+
+    char old_path[256];
+    snprintf(old_path, sizeof(old_path), "cache/%s.txt", partida->id);
+
+    char new_path[256];
+    snprintf(new_path, sizeof(new_path), "data/%s.txt", partida->id);
+    rename(old_path, new_path);
+
+    FILE *list_file = fopen("data/list.txt", "a");
+    fprintf(list_file, "%s\n", partida->id);
+    fclose(list_file);
+
+}
+
 void mostrarMensajesEstado(Partida *partida)
 {
 
+    FILE *archivo_partida = partida->archivo_partida;
+
     int n_mensajes = list_size(partida->mensajesEstado);
     printf("8 %d\n", n_mensajes);
+    fprintf(archivo_partida, "8 %d\n", n_mensajes);
+
+    char linea[256];
 
     char *mensaje;
     while ((mensaje = list_popFront(partida->mensajesEstado)) != NULL)
+    {
         printf("%s\n", mensaje);
 
-    fflush(stdout);
-}
-
-void cargarHistorial(Partida *partida)
-{
-    if (!partida || !partida->id || !partida->historial)
-        return;
-
-    char path[256];
-    snprintf(path, sizeof(path), "cache/%s", partida->id);
-
-    FILE *f = fopen(path, "r");
-    if (!f)
-        return;
-
-    char linea[256];
-    while (fgets(linea, sizeof(linea), f))
-    {
-        // Remove newline character if present
-        size_t len = strlen(linea);
-        if (len > 0 && linea[len - 1] == '\n')
-        {
-            linea[len - 1] = '\0';
-        }
-
-        char prefix[4];
-        int tipo, x, y;
-
-        if (sscanf(linea, "%3s %d %d %d", prefix, &tipo, &x, &y) == 4)
-        {
-            if (strcmp(prefix, "MOV") == 0)
-            {
-                Movimiento *mov = malloc(sizeof(Movimiento));
-                if (!mov)
-                    break;
-
-                mov->TypeMov = tipo;
-                mov->CoorX = x;
-                mov->CoorY = y;
-
-                stack_push(partida->historial, mov);
-            }
-        }
+        fprintf(archivo_partida, "%s\n", mensaje);
+        if(strncmp(mensaje, "777", 3) == 0)
+            cerrarArchivoPartida(partida);
     }
-    fclose(f);
+
+    fflush(stdout);
 }
 
 void registrarMovimientoArchivo(const char *rutaArchivo, Movimiento *mov)
@@ -967,10 +952,6 @@ void leerAccion(Partida *partida, char *buffer)
         mov->TypeMov = 4;
 
         stack_push(partida->historial, mov);
-
-        char path[256];
-        snprintf(path, sizeof(path), "cache/%s", partida->id);
-        registrarMovimientoArchivo(path, mov);
     }
     else if (tipo_accion == 5)
     {
@@ -979,18 +960,14 @@ void leerAccion(Partida *partida, char *buffer)
 
         /*
         Movimiento *mov = malloc(sizeof(Movimiento));
-        if (!mov)
+        if (!mov)a
             return;
 
         mov->CoorX = x;
         mov->CoorY = y;
         mov->TypeMov = 5;
 
-        stack_push(partida->historial, mov);
-
-        char path[256];
-        snprintf(path, sizeof(path), "cache/%s.txt", partida->id);
-        registrarMovimientoArchivo(path, mov); */
+        stack_push(partida->historial, mov); */
     }
     else
     {
@@ -1012,6 +989,9 @@ void leerTurno(Partida *partida, char *eleccion)
 
     list_clean(partida->mensajesEstado);
 
+    FILE *archivo_partida = partida->archivo_partida;
+    fprintf(archivo_partida, "%s\n", eleccion);
+
     for (int i = 0; i < n_acciones; i++)
     {
         char buffer[256];
@@ -1028,8 +1008,11 @@ void leerTurno(Partida *partida, char *eleccion)
             buffer[len - 1] = '\0';
         }
 
+        fprintf(archivo_partida, "%s\n", buffer);
+
         leerAccion(partida, buffer);
     }
+
 }
 
 int verificarFinalizacion(Partida *partida) // 0 - No finalizado, 1 - Ganador, 2 - Perdedor
@@ -1140,9 +1123,13 @@ int iniciarJuego(const char *archivo)
         printf("Error: No se pudo cargar la configuración del juego\n");
         return 1;
     }
-    cargarHistorial(partida);
+
     printf("PARDTIDA INICIADA ID %s\n", partida->id);
     fflush(stdout);
+
+    partida->archivo_partida = fopen(fullpath, "a");
+    if (!partida->archivo_partida)
+        exit(1);
 
     char buffer[256];
     while (fgets(buffer, sizeof(buffer), stdin))
@@ -1163,6 +1150,7 @@ int iniciarJuego(const char *archivo)
             char *mensaje = malloc(sizeof(char) * 256);
             sprintf(mensaje, "777 %d", resultado);
             list_pushBack(partida->mensajesEstado, mensaje);
+
         }   
 
         mostrarMensajesEstado(partida);
@@ -1170,6 +1158,87 @@ int iniciarJuego(const char *archivo)
     }
 
     free(partida);
+    return 0;
+}
+
+int leerPartida(const char *linea, Map *mapa_partidas)
+{
+    // Remove newline character safely
+    char id[256];
+    size_t len = strlen(linea);
+    
+    // Check if the line ends with newline and remove it
+    if (len > 0 && linea[len - 1] == '\n') {
+        strncpy(id, linea, len - 1);
+        id[len - 1] = '\0';  // Ensure null termination
+    } else {
+        strcpy(id, linea);   // No newline, copy as is
+    }
+
+    char fullpath[256];
+    snprintf(fullpath, sizeof(fullpath), "data/%s.txt", id);
+
+    FILE *f = fopen(fullpath, "r");
+    if (!f)
+        return 1;
+
+    int victoria = 0;
+
+    char l[256];
+    while (fgets(l, sizeof(l), f))
+    {
+        if (strncmp(l, "777", 3) == 0)
+        {
+            sscanf(l, "%*d %d", &victoria);
+            victoria = victoria == 2 ? 1 : 0;
+        }
+        
+    }
+
+    int puntuacion = 0;
+
+    printf("%s %d %d\n", id, victoria, puntuacion);
+    fflush(stdout);
+
+    fclose(f);
+    return 0;
+}
+
+int cargarHistorial(Map *mapa_partidas)
+{
+    FILE *list_file = fopen("data/list.txt", "r");
+    if (!list_file)
+        return 1;
+    
+    char linea[256];
+    while (fgets(linea, sizeof(linea), list_file))
+    {
+        if(leerPartida(linea, mapa_partidas) == 1)
+            return 1;
+    }
+
+    fclose(list_file);
+    return 0;
+}
+
+int partidas_iguales(void *a, void *b)
+{
+    Partida *partida_a = (Partida *)a;
+    Partida *partida_b = (Partida *)b;
+
+    return strcmp(partida_a->id, partida_b->id) == 0;
+}
+
+int iniciarHistorial()
+{
+    Map *mapa_partidas = map_create(partidas_iguales);
+    if (!mapa_partidas)
+        return 1;
+
+    cargarHistorial(mapa_partidas);
+
+    
+
     return 0;
 }
 
@@ -1195,57 +1264,7 @@ int main(int n_args, char *args[])
 
     // main.exe listaHistorial
     if (strcmp(args[1], "listaHistorial") == 0)
-    {
-
-        if (n_args != 3)
-        {
-            printf("Uso: listaHistorial <id_archivo>\n");
-            return 1;
-        }
-
-        char path[256];
-        snprintf(path, sizeof(path), "cache/%s", args[2]);
-
-        FILE *file = fopen(path, "r");
-        if (!file)
-        {
-            printf("Error: No se pudo abrir el archivo %s\n", path);
-            return 1;
-        }
-
-        printf("Historial de acciones:\n");
-
-        char linea[128];
-        while (fgets(linea, sizeof(linea), file))
-        {
-            // Remove newline character if present
-            size_t len = strlen(linea);
-            if (len > 0 && linea[len - 1] == '\n')
-            {
-                linea[len - 1] = '\0';
-            }
-
-            if (strncmp(linea, "MOV", 3) == 0)
-            {
-                int tipo, x, y;
-                if (sscanf(linea, "MOV %d %d %d", &tipo, &x, &y) == 3)
-                {
-                    const char *tipoTexto = (tipo == 4) ? "Ataque" : (tipo == 5) ? "Uso de Objeto"
-                                                                                 : "Desconocido";
-                    printf("- %s en (%d, %d)\n", tipoTexto, x, y);
-                }
-            }
-        }
-
-        fclose(file);
-        return 0;
-    }
-
-    // main.exe buscarPartida <id_partida>
-    if (strcmp(args[1], "buscarPartida") == 0)
-    {
-        return 1;
-    }
+        return iniciarHistorial();
 
     // main.exe ayuda
     if (strcmp(args[1], "ayuda") == 0)

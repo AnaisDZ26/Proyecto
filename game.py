@@ -755,6 +755,9 @@ class TextScene(Scene):
         # Dibujar la superficie de texto en el box
         screen.blit(text_surface, (self.text_box_x + 20, self.text_box_y + 20))
 
+    def set_current_image(self, index):
+        pass
+
     def handle_click(self, pos):
         # Si hacemos clic en cualquier lugar, acelerar o completar el texto
         if not self.finished_typing:
@@ -762,6 +765,8 @@ class TextScene(Scene):
             self.finished_typing = True
             self.current_paragraph = len(self.get_texts())
             self.current_char = 0
+            self.set_current_image(-1)
+
         return False
 
     def get_texts(self):
@@ -797,6 +802,7 @@ class IntroScene(TextScene):
         # Variables para mostrar imágenes explicativas
         self.current_image = None
         self.image_alpha = 0  # Para efecto de fade in/out
+        self.ended = False
         
         # Diccionario con imágenes y sus rangos de frames para mostrar
         # Formato: "nombre_imagen": (frame_inicio, frame_fin)
@@ -804,6 +810,12 @@ class IntroScene(TextScene):
         self.image_frames = {
             "prat": (950, -1)  # Mostrar desde frame 120 hasta el final
         }
+
+    def set_current_image(self, index):
+        if index == -1:
+            self.ended = True
+        else:
+            self.current_image = list(self.image_frames.keys())[index]
 
     def get_texts(self):
         return [
@@ -822,6 +834,11 @@ class IntroScene(TextScene):
 
     def update_image_display(self):
         """Actualizar qué imagen mostrar basado en el frame actual"""
+
+        if self.ended:
+            self.current_image = "prat"
+            return
+
         current_frame = self.game.frame - self.start_frame
         
         # Buscar qué imagen debe mostrarse en el frame actual
@@ -925,6 +942,24 @@ class HistoryScene(Scene):
         self.column_widths = [100, 200, 150, 150]  # Ancho para cada columna
         self.row_height = 40
         self.header_height = 50
+
+        if not os.path.exists("main.exe") or DEV:
+            subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"], 
+                                      capture_output=True, text=True, check=True)
+
+        pipe = subprocess.PIPE
+        self.proc = subprocess.Popen(["main.exe", "listaHistorial"],
+                                        stdin=pipe, stdout=pipe, stderr=pipe, text=True, encoding='utf-8')
+
+        self.table_data = []
+
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                break
+
+            id, victoria, puntuacion = line.split()
+            self.table_data.append([id, "anónimo", "Si" if int(victoria) == 1 else "No", int(puntuacion)])
 
     def draw_table(self, screen):
         # Dibujar fondo de la tabla
@@ -1300,7 +1335,8 @@ class MatchScene(Scene):
             try:
                 result = subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"], 
                                       capture_output=True, text=True, check=True)
-                print("Compilación exitosa")
+                if DEV:
+                    print("Compilación exitosa")
             except subprocess.CalledProcessError as e:
                 print(f"Error de compilación: {e}")
                 print(f"stdout: {e.stdout}")
@@ -1318,7 +1354,8 @@ class MatchScene(Scene):
             # Leer la primera línea de respuesta
             first_response = self.proc.stdout.readline()
             if first_response:
-                print(first_response, end='')
+                if DEV:
+                    print(first_response, end='')
             else:
                 print("Error: No se recibió respuesta del backend")
                 
@@ -1385,7 +1422,8 @@ class MatchScene(Scene):
             create_sound = self.game.assets.audio["sfx"]["create"]
             create_sound.play()
             
-            print("¡Cheat activado! +10 bombas")
+            if DEV:
+                print("¡Cheat activado! +10 bombas")
         else:
             print("Error: No se encontró el objeto 'bomb' en el panel")
 
@@ -1433,7 +1471,8 @@ class MatchScene(Scene):
                 else:
                     msg += f"5 {obj['object_id']} {obj['x']} {obj['y']}\n"
             
-            print(msg, end='')
+            if DEV:
+                print('>', msg, end='')
             
             try:
                 self.proc.stdin.write(msg)
@@ -1459,7 +1498,9 @@ class MatchScene(Scene):
                     # Leer todos los mensajes
                     for i in range(num_messages):
                         message = self.proc.stdout.readline().strip()
-                        print(message, end='\n')
+                        
+                        if DEV:
+                            print(message)
 
                         message_type = int(message.split()[0])
 
@@ -1542,7 +1583,8 @@ class SetupScene(Scene):
         self.object_panel = SetupObjectPanel(self.game, WIDTH // 5, HEIGHT * 0.8)
 
         new_boat = lambda size: {'size': size, 'pos': None, 'direction': 'h', 'selected': False }
-        self.boats = [ new_boat(2), new_boat(3), new_boat(3), new_boat(4), new_boat(5) ]
+        self.init_boats = [ new_boat(2), new_boat(3), new_boat(3), new_boat(4), new_boat(5) ]
+        self.boats = list(self.init_boats)
 
         self.ui = UIManager(self.game)
 
@@ -1650,6 +1692,7 @@ class SetupScene(Scene):
         self.grid.boats = []
         
         # Restablecer todos los barcos al estado no colocado
+        self.boats = list(self.init_boats)
         for boat in self.boats:
             boat['pos'] = None
             boat['selected'] = False
@@ -1659,6 +1702,11 @@ class SetupScene(Scene):
         destroy_sound.play()
 
     def start_match(self):
+        if not self.grid.boats:
+            deny_sound = self.game.assets.audio["sfx"]["deny"]
+            deny_sound.play()
+            return
+        
         self.game.scenes["match"]
         self.game.goto_scene("match", grid=self.grid, objects=self.object_panel.items)
 
