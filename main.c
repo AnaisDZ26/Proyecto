@@ -32,6 +32,7 @@ typedef struct
 {
     Tablero *tablero;
     List *objetos;
+    char nombre[256];
 } Jugador;
 
 typedef struct
@@ -570,6 +571,7 @@ Partida *leerConfiguracion(const char *archivo)
         return NULL;
     }
 
+
     // Inicializar lista de jugadores
     partida->jugadores = list_create();
     if (!partida->jugadores)
@@ -601,6 +603,8 @@ Partida *leerConfiguracion(const char *archivo)
         return NULL;
     }
 
+    strcpy(bot->nombre, "Arturo Prat");
+
     Jugador *usuario = (Jugador *)malloc(sizeof(Jugador));
     if (!usuario)
     {
@@ -610,6 +614,15 @@ Partida *leerConfiguracion(const char *archivo)
         fclose(file);
         return NULL;
     }
+
+    if (fscanf(file, "%255s", usuario->nombre) != 1)
+    {
+        printf("Error: No se pudo leer el nombre del jugador\n");
+        free(partida);
+        fclose(file);
+        return NULL;
+    }
+
 
     Tablero *tablero_usuario = (Tablero *)malloc(sizeof(Tablero));
     if (!tablero_usuario)
@@ -662,8 +675,6 @@ Partida *leerConfiguracion(const char *archivo)
             }
             free(tablero_usuario->valores);
             list_clean(partida->jugadores);
-            free(tablero_usuario);
-            free(usuario);
             free(partida);
             fclose(file);
             return NULL;
@@ -894,8 +905,6 @@ void mostrarMensajesEstado(Partida *partida)
     int n_mensajes = list_size(partida->mensajesEstado);
     printf("8 %d\n", n_mensajes);
     fprintf(archivo_partida, "8 %d\n", n_mensajes);
-
-    char linea[256];
 
     char *mensaje;
     while ((mensaje = list_popFront(partida->mensajesEstado)) != NULL)
@@ -1184,7 +1193,7 @@ int iniciarJuego(const char *archivo)
     return 0;
 }
 
-int leerPartida(const char *linea, Map *mapa_partidas)
+int leerPartida(const char *linea)
 {
     // Remove newline character safely
     char id[256];
@@ -1208,37 +1217,64 @@ int leerPartida(const char *linea, Map *mapa_partidas)
     if (!f)
         return 1;
 
-    int victoria = 0;
+    int victoria = -1, puntuacion = -1; // Initialize with invalid values
+    char nombre[256] = ""; // Initialize as empty string
 
     char l[256];
+    int i = 0;
     while (fgets(l, sizeof(l), f))
     {
+        // Remove newline from the line
+        size_t line_len = strlen(l);
+        if (line_len > 0 && l[line_len - 1] == '\n')
+        {
+            l[line_len - 1] = '\0';
+        }
+
         if (strncmp(l, "777", 3) == 0)
         {
-            sscanf(l, "%*d %d", &victoria);
-            victoria = victoria == 2 ? 1 : 0;
+            sscanf(l, "%*d %d %d", &victoria, &puntuacion);
+            // victoria: 1 = player wins, 2 = bot wins
+            // Convert to: 1 = player wins, 0 = bot wins
+            victoria = (victoria == 1) ? 1 : 0;
         }
+
+        if (i == 1)
+        {
+            strcpy(nombre, l);
+        }
+
+        i++;
     }
 
-    int puntuacion = 0;
+    // Check if we found valid data
+    if (victoria == -1 || puntuacion == -1 || strlen(nombre) == 0)
+    {
+        printf("Error: Datos incompletos en el archivo %s\n", id);
+        fclose(f);
+        return 1;
+    }
 
-    printf("%s %d %d\n", id, victoria, puntuacion);
+    printf("%s %s %d %d\n", id, nombre, victoria, puntuacion);
     fflush(stdout);
 
     fclose(f);
     return 0;
 }
 
-int cargarHistorial(Map *mapa_partidas)
+int cargarHistorial()
 {
     FILE *list_file = fopen("data/list.txt", "r");
     if (!list_file)
+    {
+        // printf("Error: No se pudo abrir el archivo de historial\n");
         return 1;
+    }
 
     char linea[256];
     while (fgets(linea, sizeof(linea), list_file))
     {
-        if (leerPartida(linea, mapa_partidas) == 1)
+        if (leerPartida(linea) == 1)
             return 1;
     }
 
@@ -1256,13 +1292,7 @@ int partidas_iguales(void *a, void *b)
 
 int iniciarHistorial()
 {
-    Map *mapa_partidas = map_create(partidas_iguales);
-    if (!mapa_partidas)
-        return 1;
-
-    cargarHistorial(mapa_partidas);
-
-    return 0;
+    return cargarHistorial();
 }
 
 int main(int n_args, char *args[])
@@ -1284,6 +1314,7 @@ int main(int n_args, char *args[])
         }
         return iniciarJuego(args[2]);
     }
+
 
     // main.exe listaHistorial
     if (strcmp(args[1], "listaHistorial") == 0)

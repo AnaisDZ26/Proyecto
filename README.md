@@ -20,5 +20,5 @@ $ pip install pygame
 ### Inicio
 
 ```bash
-$ python game.py
+$ python game.py <nombreDelJugador>
 ```

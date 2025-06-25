@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import random
 import math
+import sys
 
 WIDTH = 1280
 HEIGHT = 720
@@ -943,6 +944,10 @@ class HistoryScene(Scene):
         self.row_height = 40
         self.header_height = 50
 
+        # assert data folder exists
+        if not os.path.exists("data"):
+            os.makedirs("data")
+
         if not os.path.exists("main.exe") or DEV:
             subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"], 
                                       capture_output=True, text=True, check=True)
@@ -958,8 +963,8 @@ class HistoryScene(Scene):
             if not line:
                 break
 
-            id, victoria, puntuacion = line.split()
-            self.table_data.append([id, "anónimo", "Si" if int(victoria) == 1 else "No", int(puntuacion)])
+            id, nombre, victoria, puntuacion = line.split()
+            self.table_data.append([id, nombre, "Si" if int(victoria) == 0 else "No", int(puntuacion)])
 
     def draw_table(self, screen):
         # Dibujar fondo de la tabla
@@ -1300,6 +1305,7 @@ class MatchScene(Scene):
         with open(f"cache/{self.id}.txt", "w") as f:
             # Escribir ID de partida
             f.write(f"{self.id}\n")
+            f.write(f"{self.game.name}\n")
             
             # Escribir tamaño de cuadrícula
             f.write(f"{grid.size[0]} {grid.size[1]}\n")
@@ -2102,7 +2108,7 @@ class AssetManager:
         self.background = AnimatedWaveBackground(self.images["wave"], WIDTH, HEIGHT, num_waves=12)
 
 class Game:
-    def __init__(self, win_size):
+    def __init__(self, win_size, name):
         self.running = True
         pg.mixer.init()
         
@@ -2111,6 +2117,7 @@ class Game:
         
         self.win_size = win_size
         self.frame = 0
+        self.name = name
 
         self.event_manager = EventManager(self)
         self.assets = AssetManager()
@@ -2297,7 +2304,11 @@ class Engine:
         pg.quit()
 
 def main():
-    game = Game(win_size=(WIDTH, HEIGHT))
+
+    args = sys.argv[1:]
+    name = args[0] if len(args) > 0 else "anonimo"
+
+    game = Game(win_size=(WIDTH, HEIGHT), name=name)
     engine = Engine(game)
     engine.run()
 
