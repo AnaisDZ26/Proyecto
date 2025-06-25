@@ -39,6 +39,7 @@ typedef struct
     char id[ID_LENGTH + 1]; // +1 para el terminador nulo
     List *jugadores;
     List *mensajesEstado;
+    int puntaje;
     Stack *historial;
     FILE *archivo_partida;
 } Partida;
@@ -457,7 +458,7 @@ void ObjectTorpedo(Partida *partida, Tablero *tablero, int CoorX, int CoorY, int
         }
 
         current = tablero->valores[y][x];
-        
+
         if (current > 0 && current < 99)
         {
             // Hit a ship
@@ -883,7 +884,6 @@ void cerrarArchivoPartida(Partida *partida)
     FILE *list_file = fopen("data/list.txt", "a");
     fprintf(list_file, "%s\n", partida->id);
     fclose(list_file);
-
 }
 
 void mostrarMensajesEstado(Partida *partida)
@@ -903,7 +903,7 @@ void mostrarMensajesEstado(Partida *partida)
         printf("%s\n", mensaje);
 
         fprintf(archivo_partida, "%s\n", mensaje);
-        if(strncmp(mensaje, "777", 3) == 0)
+        if (strncmp(mensaje, "777", 3) == 0)
             cerrarArchivoPartida(partida);
     }
 
@@ -1012,7 +1012,6 @@ void leerTurno(Partida *partida, char *eleccion)
 
         leerAccion(partida, buffer);
     }
-
 }
 
 int verificarFinalizacion(Partida *partida) // 0 - No finalizado, 1 - Ganador, 2 - Perdedor
@@ -1052,10 +1051,9 @@ int verificarFinalizacion(Partida *partida) // 0 - No finalizado, 1 - Ganador, 2
 
                 if (DEV)
                     fprintf(file, "%d ", current->tablero->valores[i][j]);
-                
             }
 
-            if (DEV)    
+            if (DEV)
                 fprintf(file, "\n");
 
             if (hasIntactShips && !DEV)
@@ -1068,7 +1066,7 @@ int verificarFinalizacion(Partida *partida) // 0 - No finalizado, 1 - Ganador, 2
         // If this player has no intact ships, game is over
         if (!hasIntactShips)
             return winner;
-        
+
         winner++;
 
         current = list_next(partida->jugadores);
@@ -1100,7 +1098,6 @@ void tomarDecision(Partida *partida)
                     valor = 99;
 
                 tablero->valores[i][j] = valor;
-                
 
                 char *mensaje = malloc(sizeof(char) * 256);
                 sprintf(mensaje, "4 %d %d", i, j);
@@ -1108,8 +1105,34 @@ void tomarDecision(Partida *partida)
 
                 return;
             }
-            
         }
+}
+
+int calcularPuntajeJugador(Partida *partida)
+{
+    Jugador *jugador = list_first(partida->jugadores);
+    Jugador *bot = list_next(partida->jugadores);
+
+    int puntos = 0;
+
+    for (int i = 0; i < bot->tablero->alto; i++)
+    {
+        for (int j = 0; j < bot->tablero->ancho; j++)
+        {
+            if (bot->tablero->valores[i][j] < 0)
+                puntos += 5;
+        }
+    }
+
+    for (int i = 0; i < jugador->tablero->alto; i++)
+    {
+        for (int j = 0; j < jugador->tablero->ancho; j++)
+        {
+            if (jugador->tablero->valores[i][j] < 0)
+                puntos -= 2;
+        }
+    }
+    return puntos < 0 ? 0 : puntos;
 }
 
 int iniciarJuego(const char *archivo)
@@ -1130,7 +1153,6 @@ int iniciarJuego(const char *archivo)
     partida->archivo_partida = fopen(fullpath, "a");
     if (!partida->archivo_partida)
         exit(1);
-
     char buffer[256];
     while (fgets(buffer, sizeof(buffer), stdin))
     {
@@ -1148,10 +1170,11 @@ int iniciarJuego(const char *archivo)
         if (resultado > 0)
         {
             char *mensaje = malloc(sizeof(char) * 256);
-            sprintf(mensaje, "777 %d", resultado);
-            list_pushBack(partida->mensajesEstado, mensaje);
+            partida->puntaje = calcularPuntajeJugador(partida);
+            sprintf(mensaje, "777 %d %d", resultado, partida->puntaje);
 
-        }   
+            list_pushBack(partida->mensajesEstado, mensaje);
+        }
 
         mostrarMensajesEstado(partida);
         fflush(stdout);
@@ -1166,13 +1189,16 @@ int leerPartida(const char *linea, Map *mapa_partidas)
     // Remove newline character safely
     char id[256];
     size_t len = strlen(linea);
-    
+
     // Check if the line ends with newline and remove it
-    if (len > 0 && linea[len - 1] == '\n') {
+    if (len > 0 && linea[len - 1] == '\n')
+    {
         strncpy(id, linea, len - 1);
-        id[len - 1] = '\0';  // Ensure null termination
-    } else {
-        strcpy(id, linea);   // No newline, copy as is
+        id[len - 1] = '\0'; // Ensure null termination
+    }
+    else
+    {
+        strcpy(id, linea); // No newline, copy as is
     }
 
     char fullpath[256];
@@ -1192,7 +1218,6 @@ int leerPartida(const char *linea, Map *mapa_partidas)
             sscanf(l, "%*d %d", &victoria);
             victoria = victoria == 2 ? 1 : 0;
         }
-        
     }
 
     int puntuacion = 0;
@@ -1209,11 +1234,11 @@ int cargarHistorial(Map *mapa_partidas)
     FILE *list_file = fopen("data/list.txt", "r");
     if (!list_file)
         return 1;
-    
+
     char linea[256];
     while (fgets(linea, sizeof(linea), list_file))
     {
-        if(leerPartida(linea, mapa_partidas) == 1)
+        if (leerPartida(linea, mapa_partidas) == 1)
             return 1;
     }
 
@@ -1236,8 +1261,6 @@ int iniciarHistorial()
         return 1;
 
     cargarHistorial(mapa_partidas);
-
-    
 
     return 0;
 }
