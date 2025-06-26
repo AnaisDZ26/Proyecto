@@ -57,6 +57,12 @@ typedef struct
     int n_parametros_adicionales;
 } Movimiento;
 
+typedef struct
+{
+    int x;
+    int y;
+} Coordenadas;
+
 void aplicarAtaque(Partida *partida, int x, int y);
 
 // Función para imprimir un tablero
@@ -1096,30 +1102,97 @@ int verificarFinalizacion(Partida *partida) // 0 - No finalizado, 1 - Ganador, 2
 void tomarDecision(Partida *partida)
 {
     Jugador *jugador = list_first(partida->jugadores);
+    Jugador *bot = list_next(partida->jugadores);
     Tablero *tablero = jugador->tablero;
+    int ancho = tablero->ancho;
+    int alto = tablero->alto;
 
-    // Ataque secuencial
-    for (int i = 0; i < tablero->alto; i++)
-        for (int j = 0; j < tablero->ancho; j++)
-        {
-            int valor = tablero->valores[i][j];
-            if (valor >= 0 && valor != 99)
-            {
-                if (valor > 0)
-                    valor = -valor;
+    // Buscar impactos anteriores
+    for (int y = 0; y < alto; y++) {
+        for (int x = 0; x < ancho; x++) {
+            if (tablero->valores[y][x] < 0) { // Hay un impacto
+                // Ver hacia que lado hay que seguir atacando
+                if (x + 1 < ancho && tablero->valores[y][x + 1] < 0) {
+                    // Derecha
+                    int direc_x = 1;
+                    // Seguir hacia la derecha hasta que no hayan mas impactos
+                    while (x + direc_x < ancho && tablero->valores[y][x + direc_x] < 0) {
+                        direc_x++;
+                    }
+                    // Obtener la posicion del anterior impacto
+                    int nx = x + direc_x;
+                    if (nx < ancho && tablero->valores[y][nx] >= 0 && tablero->valores[y][nx] != 99) {
+                        aplicarAtaque(partida, nx, y);
+                        char *mensaje = malloc(256);
+                        sprintf(mensaje, "4 %d %d", nx, y);
+                        list_pushBack(partida->mensajesEstado, mensaje);
+                        return;
+                    }
+                    // Intentar hacia la izquierda
+                    int izq = x - 1;
+                    if (izq >= 0 && tablero->valores[y][izq] >= 0 && tablero->valores[y][izq] != 99) {
+                        aplicarAtaque(partida, izq, y);
+                        char *mensaje = malloc(256);
+                        sprintf(mensaje, "4 %d %d", izq, y);
+                        list_pushBack(partida->mensajesEstado, mensaje);
+                        return;
+                    }
+                } else if (y + 1 < alto && tablero->valores[y + 1][x] < 0) {
+                    // Vertical
+                    int dy = 1;
+                    while (y + dy < alto && tablero->valores[y + dy][x] < 0) dy++;
+                    int ny = y + dy;
+                    if (ny < alto && tablero->valores[ny][x] >= 0 && tablero->valores[ny][x] != 99) {
+                        aplicarAtaque(partida, x, ny);
+                        char *mensaje = malloc(256);
+                        sprintf(mensaje, "4 %d %d", x, ny);
+                        list_pushBack(partida->mensajesEstado, mensaje);
+                        return;
+                    }
+                    // Intentar
+                    int arriba = y - 1;
+                    if (arriba >= 0 && tablero->valores[arriba][x] >= 0 && tablero->valores[arriba][x] != 99) {
+                        aplicarAtaque(partida, x, arriba);
+                        char *mensaje = malloc(256);
+                        sprintf(mensaje, "4 %d %d", x, arriba);
+                        list_pushBack(partida->mensajesEstado, mensaje);
+                        return;
+                    }
+                } else {
+                    // Un solo impacto, probar adyacentes
+                    int dx[] = {1, -1, 0, 0};
+                    int dy[] = {0, 0, 1, -1};
 
-                if (valor == 0)
-                    valor = 99;
-
-                tablero->valores[i][j] = valor;
-
-                char *mensaje = malloc(sizeof(char) * 256);
-                sprintf(mensaje, "4 %d %d", i, j);
-                list_pushBack(partida->mensajesEstado, mensaje);
-
-                return;
+                    for (int i = 0; i < 4; i++) {
+                        int nx = x + dx[i];
+                        int ny = y + dy[i];
+                        if (nx >= 0 && nx < ancho && ny >= 0 && ny < alto &&
+                            tablero->valores[ny][nx] >= 0 && tablero->valores[ny][nx] != 99) {
+                            aplicarAtaque(partida, nx, ny);
+                            char *mensaje = malloc(256);
+                            sprintf(mensaje, "4 %d %d", nx, ny);
+                            list_pushBack(partida->mensajesEstado, mensaje);
+                            return;
+                        }
+                    }
+                }
             }
         }
+    }
+
+    // Si no se encontró ningún impacto, atacar aleatoriamente
+    int intentos = 100;
+    while (intentos--) {
+        int x = rand() % ancho;
+        int y = rand() % alto;
+        if (tablero->valores[y][x] >= 0 && tablero->valores[y][x] != 99) {
+            aplicarAtaque(partida, x, y);
+            char *mensaje = malloc(256);
+            sprintf(mensaje, "4 %d %d", x, y);
+            list_pushBack(partida->mensajesEstado, mensaje);
+            return;
+        }
+    }
 }
 
 int calcularPuntajeJugador(Partida *partida)
