@@ -983,12 +983,12 @@ class HistoryScene(Scene):
                 if not line:
                     break
 
-                print(line, end="")
+                if DEV:
+                    print(line, end="")
 
                 if "---" in line:
                     break
-
-
+                
                 id, nombre, victoria, puntuacion = line.split()
                 self.table_data.append([id, nombre, "Si" if int(victoria) == 0 else "No", int(puntuacion)])
         
@@ -1321,7 +1321,7 @@ class FinalScene(TextScene):
         self.start_frame = int(self.game.frame)
         
         # Botón para volver al menú
-        action_menu = lambda: self.game.goto_scene("history")
+        action_menu = lambda: self.game.goto_scene("menu")
         self.ui.add_button("menu", (150, 50), action_menu, "Menú Principal", center=(WIDTH//2 - 100, HEIGHT-80))
         
         # Botón para jugar de nuevo
@@ -1794,7 +1794,8 @@ class MatchScene(Scene):
                 # Analizar el número de mensajes
                 if first_line.startswith("8 "):
                     num_messages = int(first_line.split()[1])
-                    print(first_line)
+                    if DEV:
+                        print(first_line)
                     
                     # Leer todos los mensajes
                     for i in range(num_messages):
@@ -2459,10 +2460,6 @@ class Game:
             # Reproducir sonido de éxito
             create_sound = self.assets.audio["sfx"]["create"]
             create_sound.play()
-            
-            print("¡Cheat activado! +10 bombas")
-        else:
-            print("Cheat solo disponible durante el juego")
 
     def update(self, screen):
         self.event_manager.update()
