@@ -76,9 +76,9 @@ El jugador puede realizar múltiples acciones por turno.
 
 Los objetos especiales proporcionan habilidades únicas para el ataque o reconocimiento:
 
-- Bomba (ID: 1): Ataca un área de 3x3 celdas alrededor de una coordenada central.
-- Catalejo (ID: 2): Revela el estado (barco o agua) de una celda específica en el tablero del bot sin atacar.
-- Torpedo (ID: 3): Ataca una línea completa (horizontal o vertical) desde una coordenada inicial.
+- Bomba: Ataca un área de 3x3 celdas alrededor de una coordenada central.
+- Catalejo: Revela el estado (barco o agua) de una celda específica en el tablero del bot sin atacar.
+- Torpedo: Ataca una línea completa (horizontal o vertical) desde una coordenada inicial.
 
 ### Historial de Partida:
 
@@ -89,7 +89,6 @@ Los objetos especiales proporcionan habilidades únicas para el ataque o reconoc
 
 - Después de cada turno, se muestran mensajes de estado (informes de casillas atacadas).
 - El juego verifica continuamente si todos los barcos del bot han sido hundidos para determinar el fin de la partida.
-
 
 ### Funcionando correctamente:
 
@@ -165,22 +164,23 @@ Al concluir la partida podremos encontrar distintas pantallas de finalización, 
 ---
 ### Anais Diaz
 - Lógica del bot.
-- Elaboración Canva Presentación.
-- 
+- Lectura de acciones.
+- Corrección del informe final
+- Creación de la presentación.
 ---
 ### Cristian Gallardo
-- Elaboración del Historial.
-- Elaboración Canva Presentación.
-- 
+- Implementación **total** de la funcionalidad del historial.
+- Creación de la presentación.
 ---
 ### Daniel Gajardo
 - Interaccion Grafica.
 - Estrategia de Comunicacion entre Lenguajes.
-- Corrección de Errores General. 
+- Corrección de Errores General.
+- Contribución en el informe.
 ---
 ### Matías Salas
-- Gestion de Objetos.
-- Selección de TDAS.
-- Diseño Grafico y Creativo.
-- Elaboración del Readme.
+- Desarrollo de la historia del juego.
+- Implementación de objetos.
+- Logística de la finalización de la partida.
+- Diseño visual.
 ---
