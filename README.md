@@ -22,7 +22,7 @@ Desbloquea y usa bombas, torpedos, catalejos y cañones para mejorar tu punterí
 ---
 ## Cómo compilar y ejecutar
 
-Este sistema ha sido desarrollado en lenguaje C, con una interfaz grafica en Python y puede ejecutarse fácilmente utilizando **Visual Studio Code** junto con una extensión para C/C++ y una Python instalado. Para comenzar a trabajar con el sistema en tu equipo local, sigue estos pasos:
+Este sistema ha sido desarrollado en lenguaje C, con una interfaz grafica en Python y puede ejecutarse fácilmente utilizando **Visual Studio Code** junto con una extensión para C/C++ y Python instalado. Para comenzar a trabajar con el sistema en tu equipo local, sigue estos pasos:
 ---
 ### Requisitos previos:
 
