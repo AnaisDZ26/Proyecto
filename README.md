@@ -48,7 +48,7 @@ Este sistema ha sido desarrollado en lenguaje C, con una interfaz gráfica en Py
     Abre la terminal integrada (**Terminal > Nueva terminal**).
     En la terminal, ejecuta el programa con el siguiente comando:
         ```
-        python game.py
+        python game.py <nombre_jugador>
         ```
 ---
 ## Funcionalidades
