@@ -32,6 +32,7 @@ Este sistema ha sido desarrollado en lenguaje C, con una interfaz gráfica en Py
 - Tener instalado [Python](https://www.python.org/).
 - Instalar la extensión **Python**
 - Ejecutar el siguiente comando en la consola para instalar **pygame**
+ 
   ```
   $ pip install pygame
   ```
@@ -47,9 +48,10 @@ Este sistema ha sido desarrollado en lenguaje C, con una interfaz gráfica en Py
     Abre el archivo principal (**main.c**).
     Abre la terminal integrada (**Terminal > Nueva terminal**).
     En la terminal, ejecuta el programa con el siguiente comando:
-        ```
-        python game.py <nombre_jugador>
-        ```
+  
+  ```
+  python game.py <nombre_jugador>
+  ```
 ---
 ## Funcionalidades
 
