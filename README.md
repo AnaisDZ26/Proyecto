@@ -22,14 +22,13 @@ Desbloquea y usa bombas, torpedos, catalejos y cañones para mejorar tu punterí
 ---
 ## Cómo compilar y ejecutar
 
-Este sistema ha sido desarrollado en lenguaje C, con una interfaz grafica en Python y puede ejecutarse fácilmente utilizando **Visual Studio Code** junto con una extensión para C/C++, como **C/C++ Extension Pack** de Microsoft. Para comenzar a trabajar con el sistema en tu equipo local, sigue estos pasos:
+Este sistema ha sido desarrollado en lenguaje C, con una interfaz grafica en Python y puede ejecutarse fácilmente utilizando **Visual Studio Code** junto con una extensión para C/C++ y una Python instalado. Para comenzar a trabajar con el sistema en tu equipo local, sigue estos pasos:
 ---
 ### Requisitos previos:
 
 - Tener instalado [Visual Studio Code](https://code.visualstudio.com/).
 - Instalar la extensión **C/C++** (Microsoft).
 - Tener instalado un compilador de C (como **gcc**). Si estás en Windows, se recomienda instalar [MinGW](https://www.mingw-w64.org/) o utilizar el entorno [WSL](https://learn.microsoft.com/en-us/windows/wsl/).
-
 - Tener instalado [Python](https://www.python.org/).
 - Instalar la extensión **Python**
 - Ejecutar el siguiente comando en la consola para importar **pygame**
