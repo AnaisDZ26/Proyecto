@@ -139,13 +139,15 @@ Dentro de este apartado podemos seleccionar las posiciones de los barcos, rotand
 
 **3.2) Dentro de la partida**
 
-![imageNotSelection](imageReadme/notSelectionTable.png)
+![ImageSelection](imageReadme/SelectionTable.png)
 
 Dentro de esta pantalla podemos observar la cantidad de objetos que poseemos, nuestro tablero arriba a la izquierda y en grande el tablero del bot. Podemos seleccionar casillas con el mouse y confirmar el disparo con la tecla *espacio* o con el boton *"Terminar Turno"*.
 
-![ImageSelection](imageReadme/SelectionTable.png)
+![imageFireCanon](imageReadme/FireCanon.png)
 
 **3.3) Objetos**
+
+![ImageObjectMenu](imageReadme/ObjectMenu.png)
 
 Para usar un objeto basta con seleccionarlos con el mouse, de esta forma al pasar el raton por encima de el objeto, el juego mostrará un cuadro de texto explicando el funcionamiento de el objeto.
 
@@ -155,7 +157,7 @@ Para usar un objeto basta con seleccionarlos con el mouse, de esta forma al pasa
 
 **4) Definicion de partida**
 
-Al concluir la partida podremos encontrar distintas pantallas de finalización, dependiendo de el resultado de la partida, junto con dos botones, uno que nos lleva al *menú principal* y otro que nos propone *jugar de nuevo*.
+Al concluir la partida podremos encontrar distintas pantallas de finalización, dependiendo de el resultado de la partida, junto con dos botones, uno que nos lleva al *Menú Principal* y otro que nos propone *Jugar de Nuevo*.
 
 ![ImageExampleFinish](imageReadme/ExampleFinished.png)
 
