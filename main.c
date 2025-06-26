@@ -57,12 +57,6 @@ typedef struct
     int n_parametros_adicionales;
 } Movimiento;
 
-typedef struct
-{
-    int x;
-    int y;
-} Coordenadas;
-
 void aplicarAtaque(Partida *partida, int x, int y);
 
 // Función para imprimir un tablero
@@ -1006,7 +1000,7 @@ void leerTurno(Partida *partida, char *eleccion)
         exit(1);
         return;
     }
-
+    n_acciones = 1; // Solo 1 accion por turno
     list_clean(partida->mensajesEstado);
 
     FILE *archivo_partida = partida->archivo_partida;
