@@ -56,20 +56,6 @@ Este sistema ha sido desarrollado en lenguaje C, con una interfaz grafica en Pyt
 
 ### Funcionando correctamente:
 
-- 
-
-### Problemas conocidos:
-
-- 
-
-### A mejorar:
-
-- 
-
-## Tests y validación
-
-El juego ha sido probado en reiteradas ocaciones. Se verificaron:
-
 - Menú Principal.
 - Historial de Partidas.
 - Jugabilidad General.
@@ -78,9 +64,13 @@ El juego ha sido probado en reiteradas ocaciones. Se verificaron:
 - Funcionalidad de Victoria y Derrota.
 - Funcionalidad del Bot Automatizado.
 
-Casos límite considerados:
+### Problemas conocidos:
 
 - Seleccionar más de un objeto puede generar desfase a la hora de ejecutar un disparo.
+
+### A mejorar:
+
+- 
 
 ## Diseño del sistema y estructura de datos
 
@@ -88,19 +78,65 @@ Casos límite considerados:
 
 ## Ejemplo de uso
 
+**1) Menú Principal**
 
+![MenuImage](imageReadme/Menu)
+
+Dentro de este menú podemos encontrar dos botones en el centro, uno que nos lleva hasta el registro de *historial* y otro que nos lleva a la partida (*jugar*)
+
+**2) Historial**
+
+![HistorialImage](imageReadme/Historial)
+
+Dentro de este apartado podemos encontrar (en caso de haber jugado antes) la lista de partidas junto a sus respectivos puntajes.
+
+**3) Jugar**
+
+![ImageLore](imageReadme/Lore)
+
+Antes de empezar a posicionar nuestros barcos vemos la historia del juego en el que nos sometemos.
+
+**3.1) Seleccion de Barcos**
+
+![ImageBoatSelection](ImageReadme/Boats)
+
+Dentro de este apartado podemos seleccionar las posiciones de los barcos, rotando sus posiciones con la tecla *"r"*. Tambien podemos elegir la cantidad de objetos que queremos.
+
+**Consideracion Importante**: El bot tendrá la misma cantidad de botes que el jugador.
+
+**3.2) Dentro de la partida**
+
+![imageNotSelection](ImageReadme/notSelectionTable)
+
+Dentro de esta pantalla podemos observar la cantidad de objetos que poseemos, nuestro tablero arriba a la izquierda y en grande el tablero del bot. Podemos seleccionar casillas con el mouse y confirmar el disparo con la tecla *espacio* o con el boton *"Terminar Turno"*.
+
+![ImageSelection](ImageReadme/SelectionTable)
+
+**3.3) Objetos**
+
+Para usar un objeto basta con seleccionarlos con el mouse, de esta forma al pasar el raton por encima de el objeto, el juego mostrará un cuadro de texto explicando el funcionamiento de el objeto.
+
+![ImageObjectExample](ImageReadme/ObjectExample)
+
+*Objetos Disponibles: Bomba, Catalejo, Torpedo.*
+
+**4) Definicion de partida**
+
+Al concluir la partida podremos encontrar distintas pantallas de finalización, dependiendo de el resultado de la partida, junto con dos botones, uno que nos lleva al *menú principal* y otro que nos propone *jugar de nuevo*.
+
+![ImageExampleFinish](ImageReadme/ExampleFinished)
 
 ## Contribuciones
 ---
-**Anais Diaz**
+### Anais Diaz
 - 
 ---
-**Cristian Gallardo**
+### Cristian Gallardo
 -
 ---
-**Daniel Gajardo**
+### Daniel Gajardo
 -
 ---
-**Matías Salas**
+### Matías Salas
 - 
 ---
