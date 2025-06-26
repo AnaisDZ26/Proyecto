@@ -22,16 +22,16 @@ Desbloquea y usa bombas, torpedos, catalejos y cañones para mejorar tu punterí
 ---
 ## Cómo compilar y ejecutar
 
-Este sistema ha sido desarrollado en lenguaje C, con una interfaz grafica en Python y puede ejecutarse fácilmente utilizando **Visual Studio Code** junto con una extensión para C/C++ y Python instalado. Para comenzar a trabajar con el sistema en tu equipo local, sigue estos pasos:
+Este sistema ha sido desarrollado en lenguaje C, con una interfaz gráfica en Python y puede ejecutarse fácilmente utilizando **Visual Studio Code** junto con una extensión para C/C++ y Python instalado. Para comenzar a trabajar con el sistema en tu equipo local, sigue estos pasos:
 ---
 ### Requisitos previos:
 
 - Tener instalado [Visual Studio Code](https://code.visualstudio.com/).
 - Instalar la extensión **C/C++** (Microsoft).
-- Tener instalado un compilador de C (como **gcc**). Si estás en Windows, se recomienda instalar [MinGW](https://www.mingw-w64.org/) o utilizar el entorno [WSL](https://learn.microsoft.com/en-us/windows/wsl/).
+- Tener instalado el compilador de C: **gcc**. Si estás en Windows, se recomienda instalar [MinGW](https://www.mingw-w64.org/) o utilizar el entorno [WSL](https://learn.microsoft.com/en-us/windows/wsl/).
 - Tener instalado [Python](https://www.python.org/).
 - Instalar la extensión **Python**
-- Ejecutar el siguiente comando en la consola para importar **pygame**
+- Ejecutar el siguiente comando en la consola para instalar **pygame**
   ```
   $ pip install pygame
   ```
@@ -105,7 +105,7 @@ Los objetos especiales proporcionan habilidades únicas para el ataque o reconoc
 
 ### A mejorar:
 
-- Se podría agregar distintas dificultades para el bot o *misiones secundarias*, de esta forma haria un juego mas dinamico, no tan monotono. 
+- Se podría agregar distintas dificultades para el bot o *misiones secundarias*, de esta forma haria un juego más dinámico, no tan monótono. 
 
 ## Ejemplo de uso
 
@@ -131,7 +131,7 @@ Antes de empezar a posicionar nuestros barcos vemos la historia del juego en el 
 
 ![ImageBoatSelection](imageReadme/Boats.png)
 
-Dentro de este apartado podemos seleccionar las posiciones de los barcos, rotando sus posiciones con la tecla *"r"*. Tambien podemos elegir la cantidad de objetos que queremos.
+Dentro de este apartado podemos seleccionar las posiciones de los barcos, rotando sus posiciones con la tecla *"r"*. También podemos elegir la cantidad de objetos que queremos.
 
 *Consideracion Importante: El bot tendrá la misma cantidad de botes que el jugador.*
 
@@ -147,15 +147,15 @@ Dentro de esta pantalla podemos observar la cantidad de objetos que poseemos, nu
 
 ![ImageObjectMenu](imageReadme/ObjectMenu.png)
 
-Para usar un objeto basta con seleccionarlos con el mouse, de esta forma al pasar el raton por encima de el objeto, el juego mostrará un cuadro de texto explicando el funcionamiento de el objeto.
+Para usar un objeto basta con seleccionarlos con el mouse, de esta forma al pasar el ratón por encima de este el juego mostrará un cuadro de texto explicando su funcionamiento.
 
 ![ImageObjectExample](imageReadme/ObjectExample.png)
 
 *Objetos Disponibles: Bomba, Catalejo, Torpedo.*
 
-### 4) Definicion de partida
+### 4) Definición de partida
 
-Al concluir la partida podremos encontrar distintas pantallas de finalización, dependiendo de el resultado de la partida, junto con dos botones, uno que nos lleva al *Menú Principal* y otro que nos propone *Jugar de Nuevo*.
+Al concluir la partida podremos encontrar distintas pantallas de finalización dependiendo del resultado de la partida, junto con dos botones, uno que nos lleva al *Menú Principal* y otro que nos propone *Jugar de Nuevo*.
 
 ![ImageExampleFinish](imageReadme/ExampleFinished.png)
 
@@ -172,8 +172,8 @@ Al concluir la partida podremos encontrar distintas pantallas de finalización, 
 - Creación de la presentación.
 ---
 ### Daniel Gajardo
-- Interaccion Grafica.
-- Estrategia de Comunicacion entre Lenguajes.
+- Interacción Gráfica.
+- Estrategia de Comunicación entre Lenguajes.
 - Corrección de Errores General.
 - Contribución en el informe.
 ---
