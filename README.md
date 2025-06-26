@@ -110,25 +110,25 @@ Los objetos especiales proporcionan habilidades únicas para el ataque o reconoc
 
 ## Ejemplo de uso
 
-**1) Menú Principal**
+### 1) Menú Principal
 
 ![MenuImage](imageReadme/Menu.png)
 
 Dentro de este menú podemos encontrar dos botones en el centro, uno que nos lleva hasta el registro de *historial* y otro que nos lleva a la partida (*jugar*)
 
-**2) Historial**
+### 2) Historial
 
 ![HistorialImage](imageReadme/Historial.png)
 
 Dentro de este apartado podemos encontrar (en caso de haber jugado antes) la lista de partidas junto a sus respectivos puntajes.
 
-**3) Jugar**
+### 3) Jugar
 
 ![ImageLore](imageReadme/Lore.png)
 
 Antes de empezar a posicionar nuestros barcos vemos la historia del juego en el que nos sometemos.
 
-**3.1) Seleccion de Barcos**
+### 3.1) Seleccion de Barcos
 
 ![ImageBoatSelection](imageReadme/Boats.png)
 
@@ -136,7 +136,7 @@ Dentro de este apartado podemos seleccionar las posiciones de los barcos, rotand
 
 *Consideracion Importante: El bot tendrá la misma cantidad de botes que el jugador.*
 
-**3.2) Dentro de la partida**
+### 3.2) Dentro de la partida
 
 ![ImageSelection](imageReadme/SelectionTable.png)
 
@@ -144,7 +144,7 @@ Dentro de esta pantalla podemos observar la cantidad de objetos que poseemos, nu
 
 ![imageFireCanon](imageReadme/FireCanon.png)
 
-**3.3) Objetos**
+### 3.3) Objetos
 
 ![ImageObjectMenu](imageReadme/ObjectMenu.png)
 
@@ -154,7 +154,7 @@ Para usar un objeto basta con seleccionarlos con el mouse, de esta forma al pasa
 
 *Objetos Disponibles: Bomba, Catalejo, Torpedo.*
 
-**4) Definicion de partida**
+### 4) Definicion de partida
 
 Al concluir la partida podremos encontrar distintas pantallas de finalización, dependiendo de el resultado de la partida, junto con dos botones, uno que nos lleva al *Menú Principal* y otro que nos propone *Jugar de Nuevo*.
 
