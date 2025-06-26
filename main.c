@@ -47,9 +47,14 @@ typedef struct
 
 typedef struct
 {
+    int idJugador; // 0 Bot - 1 Jugador
+
     int CoorX;
     int CoorY;
     int TypeMov; // 4 - Ataque. 5 - Usar Objeto.
+
+    int *parametros_adicionales;
+    int n_parametros_adicionales;
 } Movimiento;
 
 void aplicarAtaque(Partida *partida, int x, int y);
@@ -1193,7 +1198,7 @@ int iniciarJuego(const char *archivo)
     return 0;
 }
 
-int leerPartida(const char *linea)
+Partida *leerPartida(const char *linea)
 {
     // Remove newline character safely
     char id[256];
@@ -1215,13 +1220,17 @@ int leerPartida(const char *linea)
 
     FILE *f = fopen(fullpath, "r");
     if (!f)
-        return 1;
+        return NULL;
 
     int victoria = -1, puntuacion = -1; // Initialize with invalid values
     char nombre[256] = ""; // Initialize as empty string
 
+    Stack *pila_historial = stack_create();
+
     char l[256];
     int i = 0;
+    int current_turn = 0; // 0 = bot, 1 = jugador
+
     while (fgets(l, sizeof(l), f))
     {
         // Remove newline from the line
@@ -1239,10 +1248,56 @@ int leerPartida(const char *linea)
             victoria = (victoria == 1) ? 1 : 0;
         }
 
-        if (i == 1)
+        if (strncmp(l, "8", 1) == 0)
+            current_turn = current_turn == 0 ? 1 : 0;
+
+        if (strncmp(l, "4", 1) == 0)
         {
-            strcpy(nombre, l);
+            Movimiento *movimiento = malloc(sizeof(Movimiento));
+            sscanf(l, "%*d %d %d", &movimiento->CoorX, &movimiento->CoorY);
+            movimiento->TypeMov = 4;
+            movimiento->idJugador = current_turn;
+            stack_push(pila_historial, movimiento);
         }
+
+        if (strncmp(l, "5", 1) == 0)
+        {
+            Movimiento *movimiento = malloc(sizeof(Movimiento));
+            int id_objeto;
+            sscanf(l, "%*d %d %d %d", &id_objeto, &movimiento->CoorX, &movimiento->CoorY);
+
+            int n_parametros_adicionales = 0;
+            int parametros[2];
+            parametros[0] = id_objeto;
+
+            if (id_objeto == 1) // Bomba
+                n_parametros_adicionales = 1;
+
+            else if (id_objeto == 2) // Catalejo
+                n_parametros_adicionales = 1;
+
+            else if (id_objeto == 3) // Torpedo
+            {
+                int dir = 0;
+                sscanf(l, "%*d %d %d %d", &dir);
+                parametros[1] = dir;
+                n_parametros_adicionales = 2;
+            }
+
+            movimiento->parametros_adicionales = malloc(sizeof(int) * n_parametros_adicionales);
+            movimiento->n_parametros_adicionales = n_parametros_adicionales;
+            for (int i = 0; i < n_parametros_adicionales; i++)
+            {
+                movimiento->parametros_adicionales[i] = parametros[i];
+            }
+
+            movimiento->TypeMov = 5;
+            movimiento->idJugador = current_turn;
+            stack_push(pila_historial, movimiento);
+        }
+
+        if (i == 1)
+            strcpy(nombre, l);
 
         i++;
     }
@@ -1252,34 +1307,66 @@ int leerPartida(const char *linea)
     {
         printf("Error: Datos incompletos en el archivo %s\n", id);
         fclose(f);
-        return 1;
+        return NULL;
     }
 
     printf("%s %s %d %d\n", id, nombre, victoria, puntuacion);
-    fflush(stdout);
-
     fclose(f);
-    return 0;
+
+    Partida *partida = malloc(sizeof(Partida));
+    if (!partida)
+    {
+        printf("Error: No se pudo asignar memoria para la partida\n");
+        stack_destroy(pila_historial);
+        return NULL;
+    }
+    
+    strcpy(partida->id, id);
+    partida->historial = pila_historial;
+    partida->jugadores = NULL;  // Not needed for history display
+    partida->mensajesEstado = NULL;  // Not needed for history display
+    partida->puntaje = puntuacion;
+    partida->archivo_partida = NULL;  // Not needed for history display
+
+    return partida;
 }
 
-int cargarHistorial()
+int cargarHistorial(Map *partidas)
 {
     FILE *list_file = fopen("data/list.txt", "r");
     if (!list_file)
     {
-        // printf("Error: No se pudo abrir el archivo de historial\n");
+        printf("Error: No se pudo abrir el archivo de lista de partidas\n");
         return 1;
     }
 
+
     char linea[256];
+    int loaded_count = 0;
     while (fgets(linea, sizeof(linea), list_file))
     {
-        if (leerPartida(linea) == 1)
-            return 1;
+        Partida *partida = leerPartida(linea);
+        if (partida == NULL)
+        {
+            printf("Error: No se pudo leer una partida del archivo\n");
+            continue; // Continue with next line instead of returning error
+        }
+
+        map_insert(partidas, partida->id, partida);
+        loaded_count++;
     }
 
     fclose(list_file);
-    return 0;
+
+    printf("---\n");
+    fflush(stdout);
+    
+    if (loaded_count == 0)
+    {
+        printf("Advertencia: No se cargaron partidas del historial\n");
+    }
+    
+    return 0; // Return success even if some entries failed
 }
 
 int partidas_iguales(void *a, void *b)
@@ -1290,9 +1377,111 @@ int partidas_iguales(void *a, void *b)
     return strcmp(partida_a->id, partida_b->id) == 0;
 }
 
+void imprimirHistorial(Partida *partida)
+{
+    // Check for null pointers
+    if (!partida || !partida->historial)
+    {
+        printf("Error: Partida o historial no válido\n");
+        return;
+    }
+
+    Stack *pila_historial = partida->historial;
+    Stack *aux = stack_create();
+    
+    if (!aux)
+    {
+        printf("Error: No se pudo crear la pila auxiliar\n");
+        return;
+    }
+
+    // Print movements in reverse order (LIFO)
+    while (!empty(pila_historial))
+    {
+        Movimiento *movimiento = (Movimiento *)pop(pila_historial);
+        if (movimiento)
+        {
+            if (movimiento->TypeMov == 4)
+                printf("%d %d %d %d\n", movimiento->TypeMov, movimiento->CoorX, movimiento->CoorY, movimiento->idJugador);
+            else if (movimiento->TypeMov == 5)
+            {
+                int id_objeto = movimiento->parametros_adicionales[0];
+                printf("%d %d %d %d", movimiento->TypeMov, id_objeto, movimiento->CoorX, movimiento->CoorY);
+                for (int i = 1; i < movimiento->n_parametros_adicionales; i++)
+                    printf(" %d", movimiento->parametros_adicionales[i]);
+                printf(" %d\n", movimiento->idJugador);
+            }
+            stack_push(aux, movimiento);
+        }
+    }
+
+    // Restore the original stack
+    while (!empty(aux))
+    {
+        Movimiento *movimiento = (Movimiento *)pop(aux);
+        if (movimiento)
+        {
+            stack_push(pila_historial, movimiento);
+        }
+    }
+
+    // Clean up auxiliary stack
+    stack_destroy(aux);
+}
+
 int iniciarHistorial()
 {
-    return cargarHistorial();
+    Map *partidas = map_create(partidas_iguales);
+    if (!partidas)
+    {
+        printf("Error: No se pudo crear el mapa de partidas\n");
+        return 1;
+    }
+
+    if (cargarHistorial(partidas) == 1)
+    {
+        printf("Error: No se pudo cargar el historial\n");
+        return 1;
+    }
+
+    char buffer[256];
+    while(fgets(buffer, sizeof(buffer), stdin))
+    {
+        // Remove newline character
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len - 1] == '\n')
+        {
+            buffer[len - 1] = '\0';
+            len--;
+        }
+        
+        if (strcmp(buffer, "exit") == 0)
+            break;
+
+        if (len == 0)
+            continue;
+
+        char id[256];
+        strncpy(id, buffer, sizeof(id) - 1);
+        id[sizeof(id) - 1] = '\0';  // Ensure null termination
+        
+        Partida *partida = map_search(partidas, id);
+        if (partida == NULL)
+        {
+            printf("Error: Partida no encontrada\n");
+            continue;
+        }
+
+        imprimirHistorial(partida);
+        printf("---\n");
+        fflush(stdout);
+    }
+
+    // Clean up map and its contents
+    // Note: This would require implementing map_destroy if it doesn't exist
+    // For now, we'll just return without cleaning up to avoid crashes
+    
+    return 0;
 }
 
 int main(int n_args, char *args[])

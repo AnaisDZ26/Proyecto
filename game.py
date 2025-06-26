@@ -10,7 +10,7 @@ import sys
 WIDTH = 1280
 HEIGHT = 720
 
-DEV = True
+DEV = False
 
 GRID_SIZE = (10, 10)
 
@@ -112,7 +112,7 @@ class Grid:
         grid_middle = pg.Vector2(self.grid_width // 2, self.grid_height // 2)
         self.start_pos = screen_middle - grid_middle
 
-        # Draw the grid frame first (behind the grid)
+        # Dibujar el marco de la cuadrícula primero (detrás de la cuadrícula)
         self.draw_grid_frame(screen)
 
         grid_surf = pg.Surface((self.grid_width, self.grid_height), pg.SRCALPHA)
@@ -203,7 +203,8 @@ class EnemyGrid(Grid):
         self.torpedo_orientation = 6
 
     def set_selected_object(self, object_name):
-        self.selected_object = object_name
+        self.selected_object = object_name    
+
         # Resetear orientación cuando se selecciona un nuevo objeto
         self.torpedo_orientation = 6
 
@@ -288,7 +289,9 @@ class EnemyGrid(Grid):
             grid_surf.blit(scaled_obj, obj_rect)
 
             if object_name == 'torpedo':
+
                 orientation = obj['orientation']
+
                 circle_radius = 3
                 circle_color = (255, 0, 0)
                 max_i = self.size[0] - 1
@@ -360,8 +363,15 @@ class EnemyGrid(Grid):
                         circle_radius = 3
                         circle_color = (255, 0, 0)
 
+
                         max_i = self.size[0] - 1
                         max_j = self.size[1] - 1
+
+                        if i in [1, max_i - 1]:
+                            self.torpedo_orientation = 7
+
+                        elif j in [1, max_j - 1]:
+                            self.torpedo_orientation = 6
                         
                         if self.torpedo_orientation == 6:  # Horizontal
                             if i == 0:  # left border, points right
@@ -396,7 +406,7 @@ class ObjectPanel:
         self.items = {
             'bomb': {'id': 1, 'quantity': 1, 'image': assets.images["bomb"], 'info': "Bomba\nPuede destruir casillas en un rango de 3x3"},
             'spyglass': {'id': 2, 'quantity': 1, 'image': assets.images["spyglass"], 'info': "Catalejo\nPuede ver una casilla adicional"},
-            'torpedo': {'id': 3, 'quantity': 1, 'image': assets.images["torpedo"], 'info': "Torpedo\nEs lanzado en línea recta desde el borde para destruir la primera casilla que encuentre"}
+            'torpedo': {'id': 3, 'quantity': 1, 'image': assets.images["torpedo"], 'info': "Torpedo\nEs lanzado en línea recta desde el borde para destruir la primera casilla que encuentre\nUso: Pulsa R para rotar"}
         }
         self.setup()
 
@@ -497,6 +507,7 @@ class SetupObjectPanel(ObjectPanel):
         screen.blit(plus_text, plus_text_rect)
         
         # Almacenar rectángulos para detección de clics con coordenadas relativas al panel
+        # Estas coordenadas son relativas a la superficie del panel, no a la pantalla
         self.selector_rects[item_name] = {
             'minus': pg.Rect(x, y, w // 3, h),
             'plus': pg.Rect(x + w - w // 3, y, w // 3, h)
@@ -505,8 +516,6 @@ class SetupObjectPanel(ObjectPanel):
     def handle_click(self, pos):
         # Convertir posición global a posición local del panel
         local_pos = (pos[0] - self.panel_x, pos[1] - self.panel_y)
-        audio = self.game.assets.audio["music"]
-        mixer = pg.mixer
 
         # Verificar cada botón del selector de cada elemento
         for item_name, rects in self.selector_rects.items():
@@ -518,11 +527,15 @@ class SetupObjectPanel(ObjectPanel):
                 else:
                     deny_audio = self.game.assets.audio["sfx"]["deny"]
                     deny_audio.play()
+                return True  
                     
             elif rects['plus'].collidepoint(local_pos):
                 self.items[item_name]['quantity'] += 1
                 hover_audio = self.game.assets.audio["sfx"]["hover"]
                 hover_audio.play()
+                return True  
+        
+        return False 
 
     def update(self, screen, x, y):
         self.panel_x = x
@@ -922,6 +935,10 @@ class IntroScene(TextScene):
         self.ui.update(screen)
 
 class HistoryScene(Scene):
+
+    proc = None
+    table_data = []
+
     def setup(self):
         self.ui = UIManager(self.game)
         
@@ -929,42 +946,103 @@ class HistoryScene(Scene):
         action_back = lambda: self.game.goto_scene("menu")
         self.ui.add_button("back", (120, 40), action_back, "Volver", topleft=(50, 50))
         
-        # Datos de la tabla (vacíos por ahora)
-        self.table_data = []
-        
         # Configuración de la tabla
-        self.table_width = 800
+        self.table_width = 900  # Increased width to accommodate new column
         self.table_height = 400
         self.table_x = (WIDTH - self.table_width) // 2
         self.table_y = (HEIGHT - self.table_height) // 2
         
         # Encabezados de columnas
-        self.headers = ["ID", "Jugador", "Victoria", "Puntuación"]
-        self.column_widths = [100, 200, 150, 150]  # Ancho para cada columna
+        self.headers = ["ID", "Jugador", "Victoria", "Puntuación", "Detalle"]
+        self.column_widths = [100, 200, 150, 150, 100]  # Added width for Detalle column
         self.row_height = 40
         self.header_height = 50
+
+        # Scroll variables
+        self.scroll_y = 0
+        self.max_scroll_y = 0
+        self.scroll_speed = 20
 
         # assert data folder exists
         if not os.path.exists("data"):
             os.makedirs("data")
 
-        if not os.path.exists("main.exe") or DEV:
+        if not os.path.exists("main.exe") or (DEV and self.proc is None):
             subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"], 
                                       capture_output=True, text=True, check=True)
 
         pipe = subprocess.PIPE
-        self.proc = subprocess.Popen(["main.exe", "listaHistorial"],
-                                        stdin=pipe, stdout=pipe, stderr=pipe, text=True, encoding='utf-8')
+        if self.proc is None:
+            self.proc = subprocess.Popen(["main.exe", "listaHistorial"],
+                                            stdin=pipe, stdout=pipe, stderr=pipe, text=True, encoding='utf-8')
 
-        self.table_data = []
+            self.table_data = []
 
-        while True:
-            line = self.proc.stdout.readline()
-            if not line:
-                break
+            while True:
+                line = self.proc.stdout.readline()
+                if not line:
+                    break
 
-            id, nombre, victoria, puntuacion = line.split()
-            self.table_data.append([id, nombre, "Si" if int(victoria) == 0 else "No", int(puntuacion)])
+                print(line, end="")
+
+                if "---" in line:
+                    break
+
+
+                id, nombre, victoria, puntuacion = line.split()
+                self.table_data.append([id, nombre, "Si" if int(victoria) == 0 else "No", int(puntuacion)])
+        
+
+        # Calculate max scroll after loading data
+        self.calculate_max_scroll()
+
+    def calculate_max_scroll(self):
+        """Calculate maximum scroll value based on number of rows"""
+        if not self.table_data:
+            self.max_scroll_y = 0
+            return
+            
+        data_height = len(self.table_data) * self.row_height
+        available_height = self.table_height - self.header_height
+        self.max_scroll_y = max(0, data_height - available_height + 100)
+
+    def handle_scroll(self, direction):
+        """Handle scroll wheel events"""
+        if direction > 0:  # Scroll up
+            self.scroll_y = max(0, self.scroll_y - self.scroll_speed)
+        else:  # Scroll down
+            self.scroll_y = min(self.max_scroll_y, self.scroll_y + self.scroll_speed)
+
+    def handle_click(self, pos):
+        # Check if click is on a detail button
+        if not self.table_data:
+            return False
+            
+        # Calculate table area
+        separator_y = self.table_y + self.header_height
+        
+        for row_idx, row_data in enumerate(self.table_data):
+            row_y = separator_y + (row_idx + 1) * self.row_height - self.scroll_y
+            
+            # Skip if row is not visible
+            if row_y < separator_y or row_y > separator_y + self.table_height - self.header_height:
+                continue
+            
+            # Calculate position of detail button (last column)
+            detail_x = self.table_x + sum(self.column_widths[:-1]) + 20  # Start of last column
+            detail_y = row_y + 5  # Small padding from top of row
+            detail_width = 80
+            detail_height = 30
+            
+            detail_rect = pg.Rect(detail_x, detail_y, detail_width, detail_height)
+            
+            if detail_rect.collidepoint(pos):
+                # Navigate to detail scene with match ID
+                match_id = row_data[0]  # First column is the ID
+                self.game.goto_scene("detail", match_id=match_id, proc=self.proc)
+                return True
+                
+        return False
 
     def draw_table(self, screen):
         # Dibujar fondo de la tabla
@@ -991,25 +1069,242 @@ class HistoryScene(Scene):
                     (self.table_x, separator_y), 
                     (self.table_x + self.table_width, separator_y), 2)
         
-        # Dibujar datos de la tabla (vacíos por ahora)
+        # Create a clipping surface for the data area
+        data_surface = pg.Surface((self.table_width - 20, self.table_height - self.header_height - 20))
+        data_surface.fill((10, 70, 135))
+        
+        # Dibujar datos de la tabla
         if not self.table_data:
             # Dibujar mensaje "No hay datos"
             no_data_font = pg.font.Font(None, 32)
             no_data_text = no_data_font.render("No hay datos disponibles", True, (255, 255, 255))
-            no_data_rect = no_data_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50))
-            screen.blit(no_data_text, no_data_rect)
+            no_data_rect = no_data_text.get_rect(center=(data_surface.get_width() // 2, data_surface.get_height() // 2))
+            data_surface.blit(no_data_text, no_data_rect)
         else:
             # Dibujar filas de datos (cuando hay datos disponibles)
             data_font = pg.font.Font(None, 24)
             for row_idx, row_data in enumerate(self.table_data):
-                row_y = separator_y + (row_idx + 1) * self.row_height
-                x_offset = self.table_x + 20
+                row_y = (row_idx + 1) * self.row_height - self.scroll_y
+                
+                # Skip if row is not visible
+                if row_y < 0 or row_y > data_surface.get_height():
+                    continue
+                
+                x_offset = 20
                 
                 for col_idx, cell_data in enumerate(row_data):
                     text = data_font.render(str(cell_data), True, (255, 255, 255))
                     text_rect = text.get_rect(midleft=(x_offset, row_y + self.row_height // 2))
-                    screen.blit(text, text_rect)
+                    data_surface.blit(text, text_rect)
                     x_offset += self.column_widths[col_idx]
+                
+                # Draw detail button for this row
+                detail_x = sum(self.column_widths[:-1]) + 20
+                detail_y = row_y + 5
+                detail_width = 80
+                detail_height = 30
+                
+                # Check if mouse is hovering over the button (adjust for scroll)
+                mouse_pos = pg.mouse.get_pos()
+                adjusted_mouse_y = mouse_pos[1] - self.table_y - self.header_height + 10
+                detail_rect = pg.Rect(detail_x, detail_y, detail_width, detail_height)
+                button_color = (10, 100, 180) if detail_rect.collidepoint(20, adjusted_mouse_y) else (13, 82, 154)
+                
+                # Draw button background
+                pg.draw.rect(data_surface, button_color, detail_rect, border_radius=5)
+                
+                # Draw button text
+                detail_text = data_font.render("Detalle", True, (255, 255, 255))
+                detail_text_rect = detail_text.get_rect(center=detail_rect.center)
+                data_surface.blit(detail_text, detail_text_rect)
+        
+        # Draw the data surface onto the screen
+        screen.blit(data_surface, (self.table_x + 10, self.table_y + self.header_height + 10))
+        
+        # Draw scroll indicator if needed
+        if self.max_scroll_y > 0:
+            self.draw_scroll_indicator(screen)
+
+    def draw_scroll_indicator(self, screen):
+        """Draw scroll indicator on the right side of the table"""
+        indicator_width = 8
+        indicator_x = self.table_x + self.table_width - indicator_width - 5
+        
+        # Calculate indicator height and position
+        total_height = len(self.table_data) * self.row_height
+        visible_height = self.table_height - self.header_height
+        indicator_height = max(20, (visible_height / total_height) * visible_height)
+        
+        # Calculate indicator position
+        scroll_ratio = self.scroll_y / self.max_scroll_y if self.max_scroll_y > 0 else 0
+        indicator_y = self.table_y + self.header_height + 10 + (scroll_ratio * (visible_height - indicator_height))
+        
+        # Draw scroll indicator
+        indicator_rect = pg.Rect(indicator_x, indicator_y, indicator_width, indicator_height)
+        pg.draw.rect(screen, (255, 255, 255, 150), indicator_rect, border_radius=4)
+
+    def update(self, screen):
+        self.draw_frame(screen)
+        self.draw_table(screen)
+        self.ui.update(screen)
+
+class DetailScene(Scene):
+    def setup(self, match_id, proc):
+        self.match_id = match_id
+        self.proc = proc
+        self.ui = UIManager(self.game)
+        
+        # Agregar botón de regreso
+        action_back = lambda: self.game.goto_scene("history")
+        self.ui.add_button("back", (120, 40), action_back, "Volver", topleft=(50, 50))
+        
+        # Configuración de la tabla de detalles
+        self.table_width = 800
+        self.table_height = 500
+        self.table_x = (WIDTH - self.table_width) // 2
+        self.table_y = (HEIGHT - self.table_height) // 2
+        
+        # Encabezados de columnas para detalles
+        self.headers = ["Turno", "Acción", "Posición"]
+        self.column_widths = [100, 200, 200, 200]  # Ancho para cada columna
+        self.row_height = 35
+        self.header_height = 50
+        
+        # Scroll variables
+        self.scroll_y = 0
+        self.max_scroll_y = 0
+        self.scroll_speed = 20
+        
+        # Cargar datos del match específico
+        self.match_details = []
+        self.load_match_details()
+        
+        # Calculate max scroll after loading data
+        self.calculate_max_scroll()
+
+    def calculate_max_scroll(self):
+        """Calculate maximum scroll value based on number of rows"""
+        if not self.match_details:
+            self.max_scroll_y = 0
+            return
+            
+        data_height = len(self.match_details) * self.row_height
+        available_height = self.table_height - self.header_height
+        self.max_scroll_y = max(0, data_height - available_height + 100	)
+
+    def handle_scroll(self, direction):
+        """Handle scroll wheel events"""
+        if direction > 0:  # Scroll hacia arriba
+            self.scroll_y = max(0, self.scroll_y - self.scroll_speed)
+        else:  # Scroll hacia abajo
+            self.scroll_y = min(self.max_scroll_y, self.scroll_y + self.scroll_speed)
+
+    def load_match_details(self):
+        self.proc.stdin.write(f"{self.match_id}\n")
+        self.proc.stdin.flush()
+
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                break
+            if "---" in line:
+                break
+
+            info = line.split()
+            tipo_mov = info[0]
+            jugador = "Jugador" if info[-1] == "1" else "Bot"
+
+            if tipo_mov == "4":
+                self.match_details.insert(0, [jugador, "Ataque", f"{info[2]}, {info[3]}"])
+            elif tipo_mov == "5":
+                id_objeto = info[1]
+                dict_objetos = {"1": "Bomba", "2": "Catalejo", "3": "Torpedo"}
+                self.match_details.insert(0, [jugador, f"Objeto: {dict_objetos[id_objeto]}", f"{info[3]}, {info[4]}"])
+
+    def draw_table(self, screen):
+        # Dibujar título
+        title_font = pg.font.Font(None, 36)
+        title_text = title_font.render(f"Detalles del Match {self.match_id}", True, (255, 255, 255))
+        title_rect = title_text.get_rect(center=(WIDTH // 2, self.table_y - 50))
+        screen.blit(title_text, title_rect)
+        
+        # Dibujar fondo de la tabla
+        table_rect = pg.Rect(self.table_x, self.table_y, self.table_width, self.table_height)
+        pg.draw.rect(screen, (10, 70, 135), table_rect, border_radius=10)
+        
+        # Dibujar fondo del encabezado
+        header_rect = pg.Rect(self.table_x, self.table_y, self.table_width, self.header_height)
+        pg.draw.rect(screen, (13, 82, 154), header_rect, border_radius=10)
+        
+        # Dibujar encabezados
+        font = pg.font.Font(None, 28)
+        x_offset = self.table_x + 20  # Posición x inicial con padding
+        
+        for i, header in enumerate(self.headers):
+            text = font.render(header, True, (255, 255, 255))
+            text_rect = text.get_rect(midleft=(x_offset, self.table_y + self.header_height // 2))
+            screen.blit(text, text_rect)
+            x_offset += self.column_widths[i]
+        
+        # Dibujar línea separadora
+        separator_y = self.table_y + self.header_height
+        pg.draw.line(screen, (255, 255, 255), 
+                    (self.table_x, separator_y), 
+                    (self.table_x + self.table_width, separator_y), 2)
+        
+        # Crear una superficie de datos
+        data_surface = pg.Surface((self.table_width - 20, self.table_height - self.header_height - 20))
+        data_surface.fill((10, 70, 135))
+        
+        # Dibujar datos de la tabla
+        if not self.match_details:
+            # Dibujar mensaje "No hay datos"
+            no_data_font = pg.font.Font(None, 32)
+            no_data_text = no_data_font.render("No hay detalles disponibles", True, (255, 255, 255))
+            no_data_rect = no_data_text.get_rect(center=(data_surface.get_width() // 2, data_surface.get_height() // 2))
+            data_surface.blit(no_data_text, no_data_rect)
+        else:
+            # Dibujar filas de datos
+            data_font = pg.font.Font(None, 24)
+            for row_idx, row_data in enumerate(self.match_details):
+                row_y = (row_idx + 1) * self.row_height - self.scroll_y
+                
+                # Saltar si la fila no es visible
+                if row_y < 0 or row_y > data_surface.get_height():
+                    continue
+                
+                x_offset = 20
+                
+                for col_idx, cell_data in enumerate(row_data):
+                    text = data_font.render(str(cell_data), True, (255, 255, 255))
+                    text_rect = text.get_rect(midleft=(x_offset, row_y + self.row_height // 2))
+                    data_surface.blit(text, text_rect)
+                    x_offset += self.column_widths[col_idx]
+        
+        # Dibujar la superficie de datos en la pantalla
+        screen.blit(data_surface, (self.table_x + 10, self.table_y + self.header_height + 10))
+        
+        # Dibujar el indicador de scroll si es necesario
+        if self.max_scroll_y > 0:
+            self.draw_scroll_indicator(screen)
+
+    def draw_scroll_indicator(self, screen):
+        """Dibujar el indicador de scroll en el lado derecho de la tabla"""
+        indicator_width = 8
+        indicator_x = self.table_x + self.table_width - indicator_width - 5
+        
+        # Calcular la altura y posición del indicador
+        total_height = len(self.match_details) * self.row_height
+        visible_height = self.table_height - self.header_height
+        indicator_height = max(20, (visible_height / total_height) * visible_height)
+        
+        # Calcular la posición del indicador
+        scroll_ratio = self.scroll_y / self.max_scroll_y if self.max_scroll_y > 0 else 0
+        indicator_y = self.table_y + self.header_height + 10 + (scroll_ratio * (visible_height - indicator_height))
+        
+        # Dibujar el indicador de scroll
+        indicator_rect = pg.Rect(indicator_x, indicator_y, indicator_width, indicator_height)
+        pg.draw.rect(screen, (255, 255, 255, 150), indicator_rect, border_radius=4)
 
     def update(self, screen):
         self.draw_frame(screen)
@@ -1026,7 +1321,7 @@ class FinalScene(TextScene):
         self.start_frame = int(self.game.frame)
         
         # Botón para volver al menú
-        action_menu = lambda: self.game.goto_scene("menu")
+        action_menu = lambda: self.game.goto_scene("history")
         self.ui.add_button("menu", (150, 50), action_menu, "Menú Principal", center=(WIDTH//2 - 100, HEIGHT-80))
         
         # Botón para jugar de nuevo
@@ -1716,13 +2011,15 @@ class SetupScene(Scene):
         self.game.scenes["match"]
         self.game.goto_scene("match", grid=self.grid, objects=self.object_panel.items)
 
-    def place_boat(self, pos):
-        # Encontrar el barco seleccionado
-        selected_boat = None
+    def get_selected_boat(self):
         for boat in self.boats:
             if boat['selected']:
-                selected_boat = boat
-                break
+                return boat
+        return None
+
+    def place_boat(self, pos):
+        # Encontrar el barco seleccionado
+        selected_boat = self.get_selected_boat()
         
         if not selected_boat:
             return
@@ -1772,13 +2069,13 @@ class SetupScene(Scene):
 
     def handle_click(self, pos):
         # Verificar si el clic está en el panel de objetos
-        panel_x = WIDTH - self.object_panel.width - 50
+        panel_x = WIDTH - self.object_panel.width - 100
         panel_y = HEIGHT // 2 - self.object_panel.height // 2
         panel_rect = pg.Rect(panel_x, panel_y, self.object_panel.width, self.object_panel.height)
-        
+
         if panel_rect.collidepoint(pos):
-            self.object_panel.handle_click(pos)
-            return True
+            if self.object_panel.handle_click(pos):
+                return True
             
         # Manejar colocación de barco en clic
         if self.grid.preview_pos:
@@ -1794,6 +2091,9 @@ class SetupScene(Scene):
         rect = pg.Rect(0, 0, 80, 2*HEIGHT//3)
         rect.center = (170, HEIGHT / 2)
         pg.draw.rect(screen, (13, 82, 154), rect, border_radius=5)
+
+        if self.get_selected_boat():
+            self.game.info_box.add_message("R para rotar")
 
         self.ui.update(screen)
         self.object_panel.update(screen, WIDTH - self.object_panel.width - 100, HEIGHT // 2 - self.object_panel.height // 2)
@@ -1856,7 +2156,7 @@ class InfoBox:
         self.message.append(message)
 
     def wrap_text(self, text, font, max_width):
-        # First split by newlines
+        # Primero dividir por nuevas líneas
         paragraphs = text.split('\n')
         all_lines = []
         
@@ -1865,7 +2165,7 @@ class InfoBox:
             current_line = []
             
             for word in words:
-                # Test if adding the word exceeds the width
+                # Testear si agregar la palabra excede el ancho
                 test_line = ' '.join(current_line + [word])
                 test_width = font.size(test_line)[0]
                 
@@ -1895,16 +2195,16 @@ class InfoBox:
         current_y = self.padding
         
         for message in self.message:
-            # Wrap the text
+            # Envolver el texto
             wrapped_lines = self.wrap_text(message, font, self.width)
             
-            # Draw each line
+            # Dibujar cada línea
             for line in wrapped_lines:
                 text = font.render(line, True, (255, 255, 255))
                 surf.blit(text, (self.padding, current_y))
                 current_y += text.get_height() + 2  # Add small spacing between lines
                 
-                # If we exceed the height, stop drawing
+                # Si excedemos la altura, detener el dibujo
                 if current_y > self.height - self.padding:
                     break
 
@@ -1915,7 +2215,7 @@ class UIManager:
     def __init__(self, game):
         self.game = game
         self.buttons = {}
-        self.was_hovering = {}  # Track hover state for each button
+        self.was_hovering = {}  # Rastrear el estado de hover para cada botón
 
     def add_button(self, name, size, click, text=None, image=None, opacity=1.0, topleft=None, center=None):
         rect = pg.Rect(0, 0, size[0], size[1])
@@ -1946,33 +2246,33 @@ class UIManager:
         for name, btn in self.buttons.items():
             is_hovering = btn["rect"].collidepoint(mouse_pos)
             
-            # Play hover sound when mouse enters the button
+            # Reproducir el sonido de hover cuando el mouse entra en el botón
             if is_hovering and not self.was_hovering[name]:
                 hover_sound = self.game.assets.audio["sfx"]["hover"]
                 hover_sound.play()
             
             self.was_hovering[name] = is_hovering
             
-            # Create a surface for the button with alpha support
+            # Crear una superficie para el botón con soporte de alpha
             btn_surf = pg.Surface((btn["rect"].width, btn["rect"].height), pg.SRCALPHA)
             
-            # Draw button background with opacity
+            # Dibujar el fondo del botón con opacidad
             btn_color = (10, 70, 135) if is_hovering else (13, 82, 154)
             pg.draw.rect(btn_surf, btn_color, (0, 0, btn["rect"].width, btn["rect"].height), 0, 10)
             
-            # Draw image if provided
+            # Dibujar la imagen si se proporciona
             if btn["image"]:
-                # Scale image to fit button size with some padding
+                # Escalar la imagen para ajustar el tamaño del botón con algunos márgenes
                 img_size = min(btn["rect"].width, btn["rect"].height) - 10
                 scaled_img = pg.transform.smoothscale(btn["image"], (img_size, img_size))
                 
-                # Apply opacity to image
+                # Aplicar opacidad a la imagen
                 if btn["opacity"] < 1.0:
                     scaled_img.set_alpha(int(255 * btn["opacity"]))
                 
                 img_rect = scaled_img.get_rect(center=(btn["rect"].width//2, btn["rect"].height//2))
                 btn_surf.blit(scaled_img, img_rect)
-            # Draw text if provided (and no image)
+            # Dibujar texto si se proporciona (y no imagen)
             elif btn["text"]:
                 font = pg.font.Font(None, 24)
                 text_color = (255, 255, 255, int(255 * btn["opacity"]))
@@ -1980,7 +2280,7 @@ class UIManager:
                 text_rect = text.get_rect(center=(btn["rect"].width//2, btn["rect"].height//2))
                 btn_surf.blit(text, text_rect)
             
-            # Draw the button surface onto the screen
+            # Dibujar la superficie del botón en la pantalla
             screen.blit(btn_surf, btn["rect"])
 
 class AnimatedWaveBackground:
@@ -1994,10 +2294,10 @@ class AnimatedWaveBackground:
         self.wave_layers = []
         
         base_wave_height = int(screen_height * 0.25)
-        overlap_factor = 0.3 # From user's edit
+        overlap_factor = 0.3 # De la edición del usuario
         
         for i in range(num_waves):
-            # Respect user's edit for wave height
+            # Respetar la edición del usuario para la altura de la onda
             aspect_ratio = self.wave_image.get_width() / self.wave_image.get_height()
             scaled_height = base_wave_height * 2 
             scaled_width = int(scaled_height * aspect_ratio)
@@ -2006,21 +2306,21 @@ class AnimatedWaveBackground:
             
             wave_surface = scaled_wave.copy()
 
-            # Create a brightness factor (0.0 = black, 1.0 = original color)
+            # Crear un factor de brillo (0.0 = negro, 1.0 = color original)
             brightness = 1.0 - (i / (num_waves - 1) * 0.7)
 
-            # Create a color to multiply the wave image with
+            # Crear un color para multiplicar la imagen de la onda con
             tint_value = int(255 * brightness)
             tint_color = (tint_value, tint_value, tint_value)
 
-            # Apply the darkening effect by multiplying the wave's colors
+            # Aplicar el efecto de oscurecimiento multiplicando los colores de la onda
             wave_surface.fill(tint_color, None, pg.BLEND_RGB_MULT)
             
-            # Position waves to overlap
+            # Posicionar las ondas para superponerse
             y_overlap = scaled_height * overlap_factor
             y_pos = (screen_height - scaled_height) - (i * y_overlap) + (num_waves/2 * y_overlap)
 
-            # Define movement properties for each wave
+            # Definir las propiedades de movimiento para cada onda
             direction = 1 if i % 2 == 0 else -1
             speed = 0.2 + (i * 0.01)
             frequency = 0.01 + (i * 0.007)
@@ -2056,17 +2356,17 @@ class AnimatedWaveBackground:
             
             wave_width = wave['surface'].get_width()
             
-            # Calculate how many wave instances we need to cover the entire screen
-            # We need to cover from -wave_width to screen_width + wave_width to ensure no gaps
+            # Calcular cuántas instancias de onda necesitamos para cubrir toda la pantalla
+            # Necesitamos cubrir desde -wave_width hasta screen_width + wave_width para asegurar que no haya huecos
             start_x = -wave_width
             end_x = self.screen_width + wave_width
             
-            # Calculate the first wave position that covers the left edge
+            # Calcular la posición de la primera onda que cubre el borde izquierdo
             first_wave_x = x_pos
             while first_wave_x > start_x:
                 first_wave_x -= wave_width
             
-            # Draw waves from left to right to ensure complete coverage
+            # Dibujar ondas de izquierda a derecha para asegurar cobertura completa
             current_x = first_wave_x
             while current_x < end_x:
                 screen.blit(wave['surface'], (current_x, y_pos))
@@ -2104,7 +2404,7 @@ class AssetManager:
             "prat_winner": pg.image.load("assets/img/prat_winner.png").convert_alpha(),
         }
 
-        # Create animated wave background with more waves
+        # Crear un fondo de ondas animado con más ondas
         self.background = AnimatedWaveBackground(self.images["wave"], WIDTH, HEIGHT, num_waves=12)
 
 class Game:
@@ -2112,7 +2412,7 @@ class Game:
         self.running = True
         pg.mixer.init()
         
-        # Configurar volumen general (0.0 a 1.0)
+        # Configurar el volumen general (0.0 a 1.0)
         pg.mixer.music.set_volume(0.3)  # Volumen para música de fondo
         
         self.win_size = win_size
@@ -2138,11 +2438,12 @@ class Game:
             "setup": SetupScene(self),
             "match": MatchScene(self),
             "history": HistoryScene(self),
+            "detail": DetailScene(self),
             "victory": VictoryScene(self),
             "defeat": DefeatScene(self)
         }
 
-        # Registrar cheats globalmente
+        # Registrar cheats globalmente (cheats globales)
         self.event_manager.add_cheat_sequence("bomb_cheat", pg.K_F10, 3, self.activate_bomb_cheat)
 
         self.current_scene = self.scenes["setup"] if DEV else self.scenes["menu"]
@@ -2262,6 +2563,11 @@ class EventManager:
 
             elif ev.type == pg.MOUSEBUTTONUP:
                 self.is_clicking = True
+                
+            elif ev.type == pg.MOUSEWHEEL:
+                # Handle scroll wheel events
+                if hasattr(self.game.current_scene, 'handle_scroll'):
+                    self.game.current_scene.handle_scroll(ev.y)
 
 class AnimatedSprite:
     def __init__(self, img, size, n_frames):
@@ -2273,11 +2579,11 @@ class AnimatedSprite:
         self.rows = self.img.get_height() // self.size[1]
 
     def get_frame(self, frame):
-        frame = frame % self.n_frames  # Ensure frame is within bounds
-        row = frame // self.columns    # Calculate row based on columns
-        col = frame % self.columns     # Calculate column
-        x = col * self.size[0]         # Calculate x position
-        y = row * self.size[1]         # Calculate y position
+        frame = frame % self.n_frames  # Asegurar que el frame esté dentro de los límites
+        row = frame // self.columns    # Calcular la fila basada en las columnas
+        col = frame % self.columns     # Calcular la columna
+        x = col * self.size[0]         # Calcular la posición x
+        y = row * self.size[1]         # Calcular la posición y
         return self.img.subsurface(x, y, self.size[0], self.size[1])
 
 class Engine:

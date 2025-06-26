@@ -12,7 +12,7 @@ Stack* stack_create();
 void stack_push(Stack* stack, void* data);
 
 // Removes and returns the element at the top of the stack
-void* top(Stack* stack);
+void* pop(Stack* stack);
 
 // Returns the element at the top without removing it
 void* top(Stack* stack);
