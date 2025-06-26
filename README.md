@@ -150,7 +150,7 @@ Dentro de esta pantalla podemos observar la cantidad de objetos que poseemos, nu
 
 Para usar un objeto basta con seleccionarlos con el mouse, de esta forma al pasar el raton por encima de el objeto, el juego mostrará un cuadro de texto explicando el funcionamiento de el objeto.
 
-![ImageObjectExample](ImageReadme/ObjectExample.png)
+![ImageObjectExample](imageReadme/ObjectExample.png)
 
 *Objetos Disponibles: Bomba, Catalejo, Torpedo.*
 
