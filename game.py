@@ -10,7 +10,7 @@ import sys
 WIDTH = 1280
 HEIGHT = 720
 
-DEV = True
+DEV = False
 
 GRID_SIZE = (10, 10)
 
@@ -967,32 +967,32 @@ class HistoryScene(Scene):
         if not os.path.exists("data"):
             os.makedirs("data")
 
-        if not os.path.exists("main.exe") or (DEV and self.proc is None):
+        if not os.path.exists("main.exe") or DEV:
             subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"], 
                                       capture_output=True, text=True, check=True)
 
         pipe = subprocess.PIPE
-        if self.proc is None:
-            self.proc = subprocess.Popen(["main.exe", "listaHistorial"],
-                                            stdin=pipe, stdout=pipe, stderr=pipe, text=True, encoding='utf-8')
+        self.proc = subprocess.Popen(["main.exe", "listaHistorial"],
+                                        stdin=pipe, stdout=pipe, stderr=pipe, text=True, encoding='utf-8')
 
-            self.table_data = []
+        self.table_data = []
 
-            while True:
-                line = self.proc.stdout.readline()
-                if not line:
-                    break
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                break
 
-                if DEV:
-                    print(line, end="")
+            if DEV:
+                print(line, end="")
 
-                if "---" in line:
-                    break
-                
-                id, nombre, victoria, puntuacion = line.split()
-                self.table_data.append([id, nombre, "Si" if int(victoria) == 0 else "No", int(puntuacion)])
+            if "---" in line:
+                break
+            
+            id, nombre, victoria, puntuacion = line.split()
+            self.table_data.append([id, nombre, "Si" if int(victoria) == 0 else "No", int(puntuacion)])
         
 
+        self.table_data.sort(key=lambda x: x[3], reverse=True)
         # Calculate max scroll after loading data
         self.calculate_max_scroll()
 
@@ -1155,7 +1155,7 @@ class DetailScene(Scene):
         self.ui = UIManager(self.game)
         
         # Agregar botón de regreso
-        action_back = lambda: self.game.goto_scene("history")
+        action_back = self.salir
         self.ui.add_button("back", (120, 40), action_back, "Volver", topleft=(50, 50))
         
         # Configuración de la tabla de detalles
@@ -1182,6 +1182,11 @@ class DetailScene(Scene):
         # Calculate max scroll after loading data
         self.calculate_max_scroll()
 
+    def salir(self):
+        self.proc.kill()
+        self.proc = None
+        self.game.goto_scene("history")
+
     def calculate_max_scroll(self):
         """Calculate maximum scroll value based on number of rows"""
         if not self.match_details:
@@ -1200,8 +1205,16 @@ class DetailScene(Scene):
             self.scroll_y = min(self.max_scroll_y, self.scroll_y + self.scroll_speed)
 
     def load_match_details(self):
-        self.proc.stdin.write(f"{self.match_id}\n")
-        self.proc.stdin.flush()
+
+        if not self.match_id:
+            return
+        
+        try:
+            self.proc.stdin.write(f"{self.match_id.strip()}\n")
+            self.proc.stdin.flush()
+        except:
+            print(self.match_id)
+            return
 
         while True:
             line = self.proc.stdout.readline()
@@ -1216,6 +1229,7 @@ class DetailScene(Scene):
 
             if tipo_mov == "4":
                 self.match_details.insert(0, [jugador, "Ataque", f"{info[2]}, {info[3]}"])
+                
             elif tipo_mov == "5":
                 id_objeto = info[1]
                 dict_objetos = {"1": "Bomba", "2": "Catalejo", "3": "Torpedo"}
@@ -1597,6 +1611,9 @@ class MatchScene(Scene):
             shutil.rmtree("cache")
         os.makedirs("cache")
 
+        if not os.path.exists("data"):
+            os.makedirs("data")
+
         with open(f"cache/{self.id}.txt", "w") as f:
             # Escribir ID de partida
             f.write(f"{self.id}\n")
@@ -1634,7 +1651,7 @@ class MatchScene(Scene):
         if DEV or not os.path.exists("main.exe"):
             # gcc TDAS/*.c main.c -o main.exe
             try:
-                result = subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"], 
+                subprocess.run(["gcc", "TDAS/*.c", "main.c", "-o", "main.exe"], 
                                       capture_output=True, text=True, check=True)
                 if DEV:
                     print("Compilación exitosa")
@@ -1650,7 +1667,7 @@ class MatchScene(Scene):
         try:
             pipe = subprocess.PIPE
             self.proc = subprocess.Popen(["./main.exe", "iniciarJuego", f"{self.id}.txt"], 
-                                       stdin=pipe, stdout=pipe, stderr=pipe, text=True, encoding='utf-8')
+                                       stdin=pipe, stdout=pipe, stderr=subprocess.PIPE, text=True, encoding='utf-8')
             
             # Leer la primera línea de respuesta
             first_response = self.proc.stdout.readline()
@@ -1702,7 +1719,7 @@ class MatchScene(Scene):
         self.ui.add_button("end_turn", (180, 50), action, "Terminar Turno", topleft=(WIDTH-220, HEIGHT-80))
         
         # Agregar botón 'Salir' en la esquina inferior izquierda
-        exit_action = lambda: self.game.goto_scene("menu")
+        exit_action = self.salir
         self.ui.add_button("exit", (120, 50), exit_action, "Salir", topleft=(40, HEIGHT-80))
         
         self.turn_ended = False
@@ -1711,6 +1728,10 @@ class MatchScene(Scene):
         
         # Registrar cheat de bombas en el EventManager
         self.game.event_manager.add_cheat_sequence("bomb_cheat", 241, 3, self.activate_bomb_cheat)
+
+    def salir(self):
+        self.proc.kill()
+        self.game.goto_scene("menu")
 
     def activate_bomb_cheat(self):
         """Activar el cheat de bombas"""
@@ -1742,6 +1763,7 @@ class MatchScene(Scene):
             
             # Verificar si el proceso backend sigue vivo
             if self.proc.poll() is not None:
+                print(self.proc.stdout.readlines())
                 print("Error: El proceso backend ha terminado inesperadamente")
                 # Limpiar estado del turno sin enviar mensajes
                 self.gridA.clear_target()

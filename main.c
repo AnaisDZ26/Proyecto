@@ -9,7 +9,7 @@
 
 #define ID_LENGTH 5
 #define MAX_GRID 20 // Tamaño máximo permitido de la cuadrícula
-#define DEV 1
+#define DEV 0
 
 // Estructura para almacenar información de un Barco
 typedef struct
@@ -1115,7 +1115,7 @@ int verificarFinalizacion(Partida *partida) // 0 - No finalizado, 1 - Ganador, 2
 
 // Función para tomar una decisión de ataque del bot
 // Implementa una estrategia de ataque basada en impactos previos y patrones de búsqueda
-void tomarDecision(Partida *partida) {
+void tomarDecision(Partida *partida, int *last_x, int *last_y) {
     Jugador *jugador = list_first(partida->jugadores);
     Tablero *tablero = jugador->tablero;
     int ancho = tablero->ancho;
@@ -1123,9 +1123,10 @@ void tomarDecision(Partida *partida) {
     int x_decidida = -1, y_decidida = -1;
 
     // 1. Buscar impactos previos para completar barcos
+    int flag = 0;
     for (int y = 0; y < alto && x_decidida == -1; y++) {
         for (int x = 0; x < ancho && x_decidida == -1; x++) {
-            int valor = tablero->valores[x][y]; 
+            int valor = tablero->valores[y][x]; 
             if (valor < 0) { // Celda con impacto
                 // Verificar las 4 direcciones adyacentes
                 int dx[] = {1, -1, 0, 0};
@@ -1135,24 +1136,32 @@ void tomarDecision(Partida *partida) {
                     int nx = x + dx[i];
                     int ny = y + dy[i];
                     
-                    int delta = tablero->valores[nx][ny];
-                    if (nx >= 0 && nx < ancho && ny >= 0 && ny < alto &&
-                        delta >= 0 && delta != 99) {
-                        x_decidida = nx;
-                        y_decidida = ny;
+                    if (nx >= 0 && nx < ancho && ny >= 0 && ny < alto) {
+                        int delta = tablero->valores[ny][nx];
+                        if (delta != 99 && delta >= 0) {
+                            x_decidida = nx;
+                            y_decidida = ny;
+                            flag = 1;
+                            break;
+                        }
                     }
                 }
+
+                if (flag)
+                    break;
             }
+
+            if (flag)
+                break;
         }
     }
 
     // 2. Si no encontró impactos pendientes, usar patrón de búsqueda
     if (x_decidida == -1) {
-        static int last_x = 0, last_y = 0;
         int encontrado = 0;
         
-        for (int y = last_y; y < alto && !encontrado; y++) {
-            for (int x = (y == last_y ? last_x : 0); x < ancho && !encontrado; x++) {
+        for (int y = *last_y; y < alto && !encontrado; y++) {
+            for (int x = (y == *last_y ? *last_x : 0); x < ancho && !encontrado; x++) {
                 int valor = tablero->valores[y][x];
                 if ((x + y) % 2 == 0 && valor >= 0 && valor != 99) {
                     x_decidida = x;
@@ -1160,11 +1169,11 @@ void tomarDecision(Partida *partida) {
                     encontrado = 1;
                     
                     // Actualizar última posición
-                    last_x = x + 1;
-                    last_y = y;
-                    if (last_x >= ancho) {
-                        last_x = 0;
-                        last_y++;
+                    *last_x = x + 1;
+                    *last_y = y; 
+                    if (*last_x >= ancho) {
+                        *last_x = 0;
+                        *last_y++;
                     }
                 }
             }
@@ -1174,7 +1183,7 @@ void tomarDecision(Partida *partida) {
     if (x_decidida == -1) {
         for (int y = 0; y < alto && x_decidida == -1; y++) {
             for (int x = 0; x < ancho && x_decidida == -1; x++) {
-                int valor = tablero->valores[x][y];
+                int valor = tablero->valores[y][x];
                 if (valor >= 0 && valor != 99) {
                     x_decidida = x;
                     y_decidida = y;
@@ -1184,28 +1193,19 @@ void tomarDecision(Partida *partida) {
     }
     // Si encontró coordenadas válidas, realizar el ataque
     if (x_decidida != -1 && y_decidida != -1) {
-        int valor = tablero->valores[x_decidida][y_decidida];
-        if (valor > 0) valor = -valor; // Impacto en barco
+        int valor = tablero->valores[y_decidida][x_decidida];
+        if (valor > 0 && valor != 99) valor = -valor; // Impacto en barco
         else if (valor == 0) valor = 99; // Agua
         
-        tablero->valores[x_decidida][y_decidida] = valor;
+        tablero->valores[y_decidida][x_decidida] = valor;
 
         // Registrar el mensaje
         char *mensaje = malloc(sizeof(char) * 256);
         if (mensaje) {
-            sprintf(mensaje, "4 %d %d", x_decidida, y_decidida);
+            sprintf(mensaje, "4 %d %d", y_decidida, x_decidida);
             list_pushBack(partida->mensajesEstado, mensaje);
         }
 
-        // Registrar en el historial
-        Movimiento *mov = malloc(sizeof(Movimiento));
-        if (mov) {
-            mov->CoorX = x_decidida;
-            mov->CoorY = y_decidida;
-            mov->TypeMov = 4;
-            mov->idJugador = 0; // ID del bot
-            stack_push(partida->historial, mov);
-        }
     }
 }
 
@@ -1256,6 +1256,8 @@ int iniciarJuego(const char *archivo)
     partida->archivo_partida = fopen(fullpath, "a");
     if (!partida->archivo_partida)
         exit(1);
+
+    int last_x = 0, last_y = 0;
     char buffer[256];
     while (fgets(buffer, sizeof(buffer), stdin))
     {
@@ -1267,7 +1269,7 @@ int iniciarJuego(const char *archivo)
         }
 
         leerTurno(partida, buffer);
-        tomarDecision(partida);
+        tomarDecision(partida, &last_x, &last_y);
 
         // Check if game is finished after processing the turn
         int resultado = verificarFinalizacion(partida);
@@ -1333,7 +1335,16 @@ Partida *leerPartida(const char *linea)
             l[line_len - 1] = '\0';
         }
 
-        if (strncmp(l, "777", 3) == 0)
+        if (i == 0)
+        {
+            i++;
+            continue;
+        }
+
+        else if (i == 1)
+            strcpy(nombre, l);
+
+        else if (strncmp(l, "777", 3) == 0)
         {
             sscanf(l, "%*d %d %d", &victoria, &puntuacion);
             // victoria: 1 = player wins, 2 = bot wins
@@ -1341,10 +1352,10 @@ Partida *leerPartida(const char *linea)
             victoria = (victoria == 1) ? 1 : 0;
         }
 
-        if (strncmp(l, "8", 1) == 0)
+        else if (strncmp(l, "8", 1) == 0)
             current_turn = current_turn == 0 ? 1 : 0;
 
-        if (strncmp(l, "4", 1) == 0)
+        else if (strncmp(l, "4", 1) == 0)
         {
             Movimiento *movimiento = malloc(sizeof(Movimiento));
             sscanf(l, "%*d %d %d", &movimiento->CoorX, &movimiento->CoorY);
@@ -1354,7 +1365,7 @@ Partida *leerPartida(const char *linea)
         }
         // Verificar si es un movimiento de objeto
         // 5 <id_objeto> <CoorX> <CoorY>
-        if (strncmp(l, "5", 1) == 0)
+        else if (strncmp(l, "5", 1) == 0)
         {
             Movimiento *movimiento = malloc(sizeof(Movimiento));
             int id_objeto;
@@ -1389,9 +1400,6 @@ Partida *leerPartida(const char *linea)
             movimiento->idJugador = current_turn;
             stack_push(pila_historial, movimiento);
         }
-
-        if (i == 1)
-            strcpy(nombre, l);
 
         i++;
     }
@@ -1590,7 +1598,7 @@ int main(int n_args, char *args[])
     // main.exe iniciarJuego <archivo_configuracion>
     if (strcmp(args[1], "iniciarJuego") == 0)
     {
-        if (n_args != 3)
+        if (n_args < 3)
         {
             printf("Error: iniciarJuego requiere un archivo de configuración\n");
             mostrarAyuda();
