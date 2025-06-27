@@ -109,6 +109,7 @@ void imprimirBarcos(List *barcos)
     }
 }
 
+// Función para imprimir el estado de la partida
 void verEstadoPartida(Partida *partida)
 {
     if (!partida)
@@ -154,6 +155,7 @@ void verEstadoPartida(Partida *partida)
     printf("\n=== Fin del Estado ===\n");
 }
 
+// Función para inicializar el tablero del bot
 Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto)
 {
     Tablero *tablero = (Tablero *)malloc(sizeof(Tablero));
@@ -341,6 +343,7 @@ Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List
     return barco;
 }
 
+// Función para informar el estado de una casilla
 void informarCasilla(Partida *partida, int x, int y)
 {
     Jugador *usuario = list_first(partida->jugadores);
@@ -359,6 +362,7 @@ void informarCasilla(Partida *partida, int x, int y)
     list_pushBack(partida->mensajesEstado, mensaje);
 }
 
+// Funcion para aplicar ataque a una casilla
 void aplicarAtaque(Partida *partida, int x, int y)
 {
     Jugador *usuario = list_first(partida->jugadores);
@@ -408,6 +412,7 @@ void aplicarAtaque(Partida *partida, int x, int y)
     informarCasilla(partida, x, y);
 }
 
+// Función para crear un torpedo
 void ObjectTorpedo(Partida *partida, Tablero *tablero, int CoorX, int CoorY, int Orientacion)
 {
     // Validate initial coordinates
@@ -544,6 +549,7 @@ void usarObjeto(Partida *partida, char *buffer)
     }
 }
 
+// Función para leer la configuración de la partida desde un archivo
 Partida *leerConfiguracion(const char *archivo)
 {
     FILE *file = fopen(archivo, "r");
@@ -888,6 +894,8 @@ int mostrarAyuda()
     return 0;
 }
 
+// Función para cerrar el archivo de partida y moverlo a la carpeta data
+// También actualiza la lista de partidas en data/list.txt
 void cerrarArchivoPartida(Partida *partida)
 {
     fclose(partida->archivo_partida);
@@ -1095,6 +1103,8 @@ int verificarFinalizacion(Partida *partida) // 0 - No finalizado, 1 - Ganador, 2
     return 0;
 }
 
+// Función para tomar una decisión de ataque del bot
+// Implementa una estrategia de ataque basada en impactos previos y patrones de búsqueda
 void tomarDecision(Partida *partida) {
     Jugador *jugador = list_first(partida->jugadores);
     Tablero *tablero = jugador->tablero;
@@ -1265,6 +1275,8 @@ int iniciarJuego(const char *archivo)
     return 0;
 }
 
+// Función para leer una partida desde un archivo de texto
+// Devuelve un puntero a una estructura Partida con los datos leídos
 Partida *leerPartida(const char *linea)
 {
     // Remove newline character safely
@@ -1436,6 +1448,8 @@ int cargarHistorial(Map *partidas)
     return 0; // Return success even if some entries failed
 }
 
+// Función para comparar dos partidas por su ID
+// Devuelve 1 si son iguales, 0 si son diferentes
 int partidas_iguales(void *a, void *b)
 {
     Partida *partida_a = (Partida *)a;
