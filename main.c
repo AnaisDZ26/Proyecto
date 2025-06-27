@@ -11,8 +11,7 @@
 #define MAX_GRID 20 // Tamaño máximo permitido de la cuadrícula
 #define DEV 1
 
-static int turno = 0; // Variable global para el turno actua / 0 = jugador, 1 = bot
-
+// Estructura para almacenar información de un Barco
 typedef struct
 {
     int x;
@@ -21,7 +20,8 @@ typedef struct
     int orientacion; // 0 - Horizontal. 1 - Vertical.
     int id;          // ID del barco
 } Barco;
-
+// Estructura para almacenar información de un tablero
+// Cada celda del tablero contendrá un ID de barco o 0 si está vacía
 typedef struct
 {
     int **valores;
@@ -29,14 +29,14 @@ typedef struct
     int ancho;
     int alto;
 } Tablero;
-
+// Estructura para almacenar información de un jugador
 typedef struct
 {
     Tablero *tablero;
     List *objetos;
     char nombre[256];
 } Jugador;
-
+// Estructura para almacenar información de una partida
 typedef struct
 {
     char id[ID_LENGTH + 1]; // +1 para el terminador nulo
@@ -46,7 +46,7 @@ typedef struct
     Stack *historial;
     FILE *archivo_partida;
 } Partida;
-
+// Estructura para almacenar información de un movimiento
 typedef struct
 {
     int idJugador; // 0 Bot - 1 Jugador
@@ -64,6 +64,7 @@ void aplicarAtaque(Partida *partida, int x, int y);
 // Función para imprimir un tablero
 void imprimirTablero(Tablero *tablero, int es_bot)
 {
+    // Verificar si el tablero es bot o jugador
     printf("\nTablero del %s:\n", es_bot ? "Bot" : "Jugador");
     printf("  ");
     for (int j = 0; j < tablero->ancho; j++)
@@ -71,7 +72,7 @@ void imprimirTablero(Tablero *tablero, int es_bot)
         printf("%2d ", j);
     }
     printf("\n");
-
+    // Imprimir el tablero
     for (int i = 0; i < tablero->alto; i++)
     {
         printf("%2d ", i);
@@ -98,7 +99,7 @@ void imprimirBarcos(List *barcos)
     printf("\nBarcos:\n");
     printf("ID | Tamano | Orientacion | Posicion\n");
     printf("--------------------------------\n");
-
+    // Iterar a través de la lista de barcos e imprimir sus detalles
     for (Barco *b = list_first(barcos); b != NULL; b = list_next(barcos))
     {
         printf("%2d | %6d | %10s | (%d,%d)\n",
@@ -112,6 +113,7 @@ void imprimirBarcos(List *barcos)
 // Función para imprimir el estado de la partida
 void verEstadoPartida(Partida *partida)
 {
+    // Evitar problemas con la memoria si no hay partida activa
     if (!partida)
     {
         printf("Error: No hay partida activa\n");
@@ -121,25 +123,25 @@ void verEstadoPartida(Partida *partida)
     printf("\n=== Estado de la Partida ===\n");
     printf("ID de la partida: %s\n", partida->id);
 
-    // Get both players
+    // Obtener los jugadores
     Jugador *jugador = list_first(partida->jugadores);
     Jugador *bot = list_next(partida->jugadores);
-
+    // Evitar problemas con la memoria si no se encuentran los jugadores (jugador o bot)
     if (!jugador || !bot)
     {
         printf("Error: No se encontraron los jugadores\n");
         return;
     }
 
-    // Print player's board and boats
+    // Imprimir información del jugador (Su tablero y barcos)
     imprimirTablero(jugador->tablero, 0);
     imprimirBarcos(jugador->tablero->barcos);
 
-    // Print bot's board and boats
+    // Imprimir información del bot (Su tablero y barcos)
     imprimirTablero(bot->tablero, 1);
     imprimirBarcos(bot->tablero->barcos);
 
-    // Print objects if any
+    // Imprimir objetos del jugador y del bot
     if (list_size(jugador->objetos) > 0)
     {
         printf("\nObjetos del jugador:\n");
@@ -177,7 +179,8 @@ Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto)
         free(tablero);
         return NULL;
     }
-
+    // Asignar memoria para cada fila del tablero
+    // y inicializarla con ceros
     for (int i = 0; i < tablero->alto; i++)
     {
         tablero->valores[i] = (int *)malloc(tablero->ancho * sizeof(int));
@@ -193,7 +196,6 @@ Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto)
             free(tablero);
             return NULL;
         }
-        // Inicializar fila con ceros
         for (int j = 0; j < tablero->ancho; j++)
         {
             tablero->valores[i][j] = 0;
@@ -222,6 +224,7 @@ Tablero *inicializarTableroBot(List *player_boats, int ancho, int alto)
     for (Barco *player_boat = list_first(player_boats); player_boat != NULL; player_boat = list_next(player_boats))
     {
         Barco *barco = (Barco *)malloc(sizeof(Barco));
+        // Evitar problemas con la memoria si no se puede asignar espacio para el barco
         if (!barco)
         {
             printf("Error: No se pudo asignar memoria para el barco %d\n", boat_id);
@@ -311,6 +314,7 @@ Barco *leerCelda(int boat_id, int i, int j, int rows, int cols, int **grid, List
     Barco *barco = NULL;
     for (Barco *b = list_first(barcos_temp); b != NULL; b = list_next(barcos_temp))
     {
+        // Si encontramos un barco con el mismo ID, lo actualizamos
         if (b->id == boat_id)
         {
             barco = b;
@@ -349,6 +353,7 @@ void informarCasilla(Partida *partida, int x, int y)
     Jugador *usuario = list_first(partida->jugadores);
     Jugador *bot = list_next(partida->jugadores);
 
+    // Validar coordenadas
     int valor = bot->tablero->valores[y][x];
 
     if (valor == 0)
@@ -378,17 +383,17 @@ void aplicarAtaque(Partida *partida, int x, int y)
     {
         valor = bot->tablero->valores[y][x];
 
-        // Check if this cell has already been attacked
+        // Verificar si la celda ya ha sido atacada
         if (valor == 99 || valor < 0)
         {
-            // Cell already attacked, don't attack again
+            // La celda ya ha sido atacada
             free(mensaje);
             return;
         }
 
         if (valor > 0) // Impacto a un barco
         {
-            valor = -valor; // Mark as hit
+            valor = -valor; // Marcar como atacado
         }
         else if (valor == 0)
         {
@@ -407,7 +412,7 @@ void aplicarAtaque(Partida *partida, int x, int y)
         free(mensaje);
         exit(1);
     }
-
+    // Crear mensaje de estado
     bot->tablero->valores[y][x] = valor;
     informarCasilla(partida, x, y);
 }
@@ -415,7 +420,7 @@ void aplicarAtaque(Partida *partida, int x, int y)
 // Función para crear un torpedo
 void ObjectTorpedo(Partida *partida, Tablero *tablero, int CoorX, int CoorY, int Orientacion)
 {
-    // Validate initial coordinates
+    // Validar coordenadas iniciales
     if (CoorX < 0 || CoorX >= tablero->ancho || CoorY < 0 || CoorY >= tablero->alto)
     {
         printf("Error: Coordenadas iniciales fuera de rango\n");
@@ -448,43 +453,44 @@ void ObjectTorpedo(Partida *partida, Tablero *tablero, int CoorX, int CoorY, int
 
     int x = CoorX, y = CoorY;
 
-    // Check current position first
+    // Chequear si la coordenada inicial es válida
     int current = tablero->valores[y][x];
     if (current > 0 && current < 99)
     {
         aplicarAtaque(partida, x, y);
-        return; // Hit a ship, stop
+        return; // Detener si se golpea un barco
     }
 
     informarCasilla(partida, x, y);
 
-    // Move in the specified direction until hitting a ship or reaching board boundary
+    // Mover en la dirección del torpedo
     while (1)
     {
         x += dir_x;
         y += dir_y;
 
-        // Check if we're still within board boundaries
+        // Chequear si las coordenadas están dentro de los límites del tablero
         if (x < 0 || x >= tablero->ancho || y < 0 || y >= tablero->alto)
         {
-            break; // Out of bounds, stop
+            break; // Salir si se sale del tablero
         }
 
         current = tablero->valores[y][x];
 
         if (current > 0 && current < 99)
         {
-            // Hit a ship
+            // Si se golpea un barco, aplicar ataque y detener
             aplicarAtaque(partida, x, y);
             break;
         }
-
+        // Si se golpea agua, informar la casilla y seguir
         informarCasilla(partida, x, y);
     }
 }
 
 void usarObjeto(Partida *partida, char *buffer)
 {
+    // Validar que el buffer tenga al menos 3 caracteres (ID del objeto, Coordenada X y Coordenada Y)
     int code, ID;
     sscanf(buffer, "%*d %d", &ID);
 
@@ -550,6 +556,7 @@ void usarObjeto(Partida *partida, char *buffer)
 }
 
 // Función para leer la configuración de la partida desde un archivo
+// Considerando los problemas de memoria que se podrian ocasionar en caso de una mala lectura
 Partida *leerConfiguracion(const char *archivo)
 {
     FILE *file = fopen(archivo, "r");
@@ -872,6 +879,7 @@ Partida *leerConfiguracion(const char *archivo)
     return partida;
 }
 
+// Mostrar una ayuda básica del juego al usuario
 int mostrarAyuda()
 {
     printf("Battleship Game - Ayuda\n");
@@ -914,9 +922,8 @@ void cerrarArchivoPartida(Partida *partida)
 
 void mostrarMensajesEstado(Partida *partida)
 {
-
     FILE *archivo_partida = partida->archivo_partida;
-
+    // Mostrar mensajes de estado en la consola y en el archivo de partida
     int n_mensajes = list_size(partida->mensajesEstado);
     printf("8 %d\n", n_mensajes);
     fprintf(archivo_partida, "8 %d\n", n_mensajes);
@@ -934,6 +941,7 @@ void mostrarMensajesEstado(Partida *partida)
     fflush(stdout);
 }
 
+// Esta función se usa para registrar los movimientos de ataque y uso de objetos
 void registrarMovimientoArchivo(const char *rutaArchivo, Movimiento *mov)
 {
     FILE *file = fopen(rutaArchivo, "a");
@@ -946,8 +954,10 @@ void registrarMovimientoArchivo(const char *rutaArchivo, Movimiento *mov)
     fclose(file);
 }
 
+
 void leerAccion(Partida *partida, char *buffer)
 {
+    // Validar que el buffer tenga al menos 1 carácter (tipo de acción)
     int tipo_accion;
 
     if (sscanf(buffer, "%d", &tipo_accion) != 1)
@@ -966,7 +976,7 @@ void leerAccion(Partida *partida, char *buffer)
         }
 
         aplicarAtaque(partida, x, y);
-
+        // Registrar el movimiento en el historial
         Movimiento *mov = malloc(sizeof(Movimiento));
         if (!mov)
             return;
@@ -1210,6 +1220,7 @@ int calcularPuntajeJugador(Partida *partida)
     {
         for (int j = 0; j < bot->tablero->ancho; j++)
         {
+            // Sumar puntos atacando barcos del bot
             if (bot->tablero->valores[i][j] < 0)
                 puntos += 5;
         }
@@ -1220,6 +1231,7 @@ int calcularPuntajeJugador(Partida *partida)
         for (int j = 0; j < jugador->tablero->ancho; j++)
         {
             if (jugador->tablero->valores[i][j] < 0)
+                // Restar puntos por barcos que atacó el bot
                 puntos -= 2;
         }
     }
@@ -1240,13 +1252,14 @@ int iniciarJuego(const char *archivo)
 
     printf("PARDTIDA INICIADA ID %s\n", partida->id);
     fflush(stdout);
-
+    // Crear archivo de partida
     partida->archivo_partida = fopen(fullpath, "a");
     if (!partida->archivo_partida)
         exit(1);
     char buffer[256];
     while (fgets(buffer, sizeof(buffer), stdin))
     {
+        // Leer línea de entrada
         size_t len = strlen(buffer);
         if (len > 0 && buffer[len - 1] == '\n')
         {
@@ -1260,6 +1273,7 @@ int iniciarJuego(const char *archivo)
         int resultado = verificarFinalizacion(partida);
         if (resultado > 0)
         {
+            // Game finished, determine winner
             char *mensaje = malloc(sizeof(char) * 256);
             partida->puntaje = calcularPuntajeJugador(partida);
             sprintf(mensaje, "777 %d %d", resultado, partida->puntaje);
@@ -1338,7 +1352,8 @@ Partida *leerPartida(const char *linea)
             movimiento->idJugador = current_turn;
             stack_push(pila_historial, movimiento);
         }
-
+        // Verificar si es un movimiento de objeto
+        // 5 <id_objeto> <CoorX> <CoorY>
         if (strncmp(l, "5", 1) == 0)
         {
             Movimiento *movimiento = malloc(sizeof(Movimiento));
@@ -1362,7 +1377,7 @@ Partida *leerPartida(const char *linea)
                 parametros[1] = dir;
                 n_parametros_adicionales = 2;
             }
-
+            // Asignar los parámetros adicionales al movimiento
             movimiento->parametros_adicionales = malloc(sizeof(int) * n_parametros_adicionales);
             movimiento->n_parametros_adicionales = n_parametros_adicionales;
             for (int i = 0; i < n_parametros_adicionales; i++)
@@ -1418,8 +1433,7 @@ int cargarHistorial(Map *partidas)
         printf("Error: No se pudo abrir el archivo de lista de partidas\n");
         return 1;
     }
-
-
+    // Clear the map before loading new entries
     char linea[256];
     int loaded_count = 0;
     while (fgets(linea, sizeof(linea), list_file))
