@@ -10,7 +10,7 @@ import sys
 WIDTH = 1280
 HEIGHT = 720
 
-DEV = False
+DEV = True
 
 GRID_SIZE = (10, 10)
 

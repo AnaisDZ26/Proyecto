@@ -1105,7 +1105,8 @@ void tomarDecision(Partida *partida) {
     // 1. Buscar impactos previos para completar barcos
     for (int y = 0; y < alto && x_decidida == -1; y++) {
         for (int x = 0; x < ancho && x_decidida == -1; x++) {
-            if (tablero->valores[y][x] < 0) { // Celda con impacto
+            int valor = tablero->valores[x][y]; 
+            if (valor < 0) { // Celda con impacto
                 // Verificar las 4 direcciones adyacentes
                 int dx[] = {1, -1, 0, 0};
                 int dy[] = {0, 0, 1, -1};
@@ -1114,8 +1115,9 @@ void tomarDecision(Partida *partida) {
                     int nx = x + dx[i];
                     int ny = y + dy[i];
                     
+                    int delta = tablero->valores[nx][ny];
                     if (nx >= 0 && nx < ancho && ny >= 0 && ny < alto &&
-                        tablero->valores[ny][nx] >= 0 && tablero->valores[ny][nx] != 99) {
+                        delta >= 0 && delta != 99) {
                         x_decidida = nx;
                         y_decidida = ny;
                     }
@@ -1131,7 +1133,8 @@ void tomarDecision(Partida *partida) {
         
         for (int y = last_y; y < alto && !encontrado; y++) {
             for (int x = (y == last_y ? last_x : 0); x < ancho && !encontrado; x++) {
-                if ((x + y) % 2 == 0 && tablero->valores[y][x] >= 0 && tablero->valores[y][x] != 99) {
+                int valor = tablero->valores[y][x];
+                if ((x + y) % 2 == 0 && valor >= 0 && valor != 99) {
                     x_decidida = x;
                     y_decidida = y;
                     encontrado = 1;
@@ -1151,7 +1154,8 @@ void tomarDecision(Partida *partida) {
     if (x_decidida == -1) {
         for (int y = 0; y < alto && x_decidida == -1; y++) {
             for (int x = 0; x < ancho && x_decidida == -1; x++) {
-                if (tablero->valores[y][x] >= 0 && tablero->valores[y][x] != 99) {
+                int valor = tablero->valores[x][y];
+                if (valor >= 0 && valor != 99) {
                     x_decidida = x;
                     y_decidida = y;
                 }
@@ -1160,16 +1164,16 @@ void tomarDecision(Partida *partida) {
     }
     // Si encontró coordenadas válidas, realizar el ataque
     if (x_decidida != -1 && y_decidida != -1) {
-        int valor = tablero->valores[y_decidida][x_decidida];
+        int valor = tablero->valores[x_decidida][y_decidida];
         if (valor > 0) valor = -valor; // Impacto en barco
         else if (valor == 0) valor = 99; // Agua
         
-        tablero->valores[y_decidida][x_decidida] = valor;
+        tablero->valores[x_decidida][y_decidida] = valor;
 
         // Registrar el mensaje
         char *mensaje = malloc(sizeof(char) * 256);
         if (mensaje) {
-            sprintf(mensaje, "4 %d %d %d", x_decidida, y_decidida, valor);
+            sprintf(mensaje, "4 %d %d", x_decidida, y_decidida);
             list_pushBack(partida->mensajesEstado, mensaje);
         }
 
