@@ -992,16 +992,6 @@ void leerAccion(Partida *partida, char *buffer)
 
         usarObjeto(partida, buffer);
 
-        /*
-        Movimiento *mov = malloc(sizeof(Movimiento));
-        if (!mov)a
-            return;
-
-        mov->CoorX = x;
-        mov->CoorY = y;
-        mov->TypeMov = 5;
-
-        stack_push(partida->historial, mov); */
     }
     else
     {
